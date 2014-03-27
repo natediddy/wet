@@ -1,0 +1,23 @@
+WEather Tool (wet)
+---------------------
+
+Wet is a command line tool written in C that can get current weather
+conditions, as well as a general 5 day forecast. All options can be seen
+by running:
+
+    wet help
+
+And for a specific command, run:
+
+    wet help [COMMAND]
+
+
+
+Compiling/Installing
+---------------------
+
+In order to compile wet, you must make sure libcurl is installed on your
+system. From the project directory, run:
+
+    make
+    sudo make install
