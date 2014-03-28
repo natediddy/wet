@@ -33,8 +33,8 @@
 #include "wet-util.h"
 
 #define PORT               80
-#define HOST               "wxdata.weather.com"
 #define GET                "GET %s HTTP/1.1\r\nHost: " HOST "\r\n\r\n"
+#define HOST               "wxdata.weather.com"
 #define WEATHER_DATA_PATH  "/wxdata/weather/local/%s?unit=%s&dayf=5&cc=*"
 #define WEATHER_LOCID_PATH "/wxdata/search/search?where=%s"
 
@@ -59,45 +59,22 @@ static char *content = NULL;
 
 #define __assign_unknown(__r) strncpy (__r, DATA_UNKNOWN, DATA_UNKNOWN_SIZE)
 
-#if 0
 #define __assign(__p, __n, __c, __r) \
   do { \
     size_t __i = 0; \
-    for (__p = __p + __n; (*__p && (*__p != __c)); ++p) \
+    for (__p += __n; (*__p && (*__p != __c)); ++__p) \
       __r[__i++] = *__p; \
     __r[__i] = '\0'; \
   } while (0)
 
-#define __find_and_assign(__p, __s, __pt, __c, __r) \
+#define __find_and_assign(__p, __s, __q, __c, __r) \
   do { \
-    __p = strstr (__s, __pt); \
-    if (__p && *__p) \
-      __assign (__p, strlen (__pt), __c, __r); \
-    else if (use_unknown_string) \
-      __assign_unknown (__r); \
-  } while (0)
-#endif
-
-#define __assign(__p, __n, __c, __r) \
-  do { \
-    size_t __i; \
-    size_t __j = 0; \
-    __p = __p + __n; \
-    for (__i = 0; __p[__i] != __c; ++__i) \
-      __r[__j++] = __p[__i]; \
-    __r[__j] = '\0'; \
-  } while (0)
-
-#define __find_and_assign(__p, __s, __pt, __c, __r) \
-  do { \
-    __p = strstr (__s, __pt); \
+    __p = strstr (__s, __q); \
     if (__p && *__p) { \
-      size_t __i; \
-      size_t __j = 0; \
-      __p = __p + strlen (__pt); \
-      for (__i = 0; __p[__i] != __c; ++__i) \
-        __r[__j++] = __p[__i]; \
-      __r[__j] = '\0'; \
+      size_t __i = 0; \
+      for (__p += strlen (__q); (*__p && (*__p != __c)); ++__p) \
+        __r[__i++] = *__p; \
+      __r[__i] = '\0'; \
     } else if (use_unknown_string) \
       __assign_unknown (__r); \
   } while (0)
@@ -410,24 +387,20 @@ encode_string (char *buffer, size_t max, const char *str)
 static void
 retrieve_header (int sock, char *buffer, size_t n)
 {
-  bool stop;
   size_t pos;
   ssize_t n_read;
 
-  stop = false;
   pos = 0;
   buffer[0] = '\0';
 
-  while (!stop) {
+  while (true) {
     n_read = read (sock, buffer + pos, 1);
-    if (n_read > 0) {
+    if (n_read) {
       pos += n_read;
       buffer[pos] = '\0';
       if (strstr (buffer, HEADER_DELIMITER))
-        stop = true;
-      continue;
+        break;
     }
-    break;
   }
 }
 
@@ -435,7 +408,6 @@ static void
 read_header (struct headerdata *hd, const char *header)
 {
   size_t i;
-  size_t j;
   char status_buffer[64];
   char content_length_buffer[64];
   char *p;
@@ -447,55 +419,50 @@ read_header (struct headerdata *hd, const char *header)
   status_buffer[0] = '\0';
   p = strstr (header, "HTTP/1.1 ");
   if (p && *p) {
-    p = p + strlen ("HTTP/1.1 ");
-    j = 0;
-    for (i = 0; (p[i] && (p[i] != ' ')); ++i)
-      status_buffer[j++] = p[i];
-    status_buffer[j] = '\0';
+    i = 0;
+    for (p += strlen ("HTTP/1.1 "); (*p && (*p != ' ')); ++p)
+      status_buffer[i++] = *p;
+    status_buffer[i] = '\0';
     hd->status = wet_str2int (status_buffer);
-    if (p[i] == ' ')
-      ++i;
-    j = 0;
-    for (; (p[i] && (p[i] != '\r')); ++i)
-      hd->status_text[j++] = p[i];
-    hd->status_text[j] = '\0';
+    while (*p && (*p == ' '))
+      p++;
+    i = 0;
+    for (; (*p && (*p != '\r')); ++p)
+      hd->status_text[i++] = *p;
+    hd->status_text[i] = '\0';
   }
 
   content_length_buffer[0] = '\0';
   p = strstr (header, "Content-Length:");
   if (p && *p) {
-    p = p + strlen ("Content-Length:");
+    p += strlen ("Content-Length:");
     while (*p && (*p == ' '))
       p++;
-    j = 0;
-    for (i = 0; (p[i] && (p[i] != '\r')); ++i)
-      content_length_buffer[j++] = p[i];
-    content_length_buffer[j] = '\0';
-    hd->content_length = wet_str2size_t (content_length_buffer);
+    i = 0;
+    for (; (*p && (*p != '\r')); ++p)
+      content_length_buffer[i++] = *p;
+    content_length_buffer[i] = '\0';
+    hd->content_length = wet_str2size (content_length_buffer);
   }
 }
 
 static void
 retrieve_content (int sock, ssize_t n)
 {
-  bool stop;
   size_t pos;
   ssize_t n_read;
 
-  stop = false;
   pos = 0;
   content[0] = '\0';
 
-  while (!stop) {
+  while (true) {
     n_read = read (sock, content + pos, 1);
-    if (n_read > 0) {
+    if (n_read) {
       pos += n_read;
       content[pos] = '\0';
       if (pos >= n)
-        stop = true;
-      continue;
+        break;
     }
-    break;
   }
 }
 
@@ -550,10 +517,7 @@ http_get_request (const char *path)
     wet_die ("http: %i (%s)", hd.status, hd.status_text);
   }
 
-  if (content) {
-    free (content);
-    content = NULL;
-  }
+  wet_free (content);
 
   content = (char *) malloc (hd.content_length + 1);
   if (!content) {
@@ -568,10 +532,7 @@ http_get_request (const char *path)
 static void
 cleanup (void)
 {
-  if (content) {
-    free (content);
-    content = NULL;
-  }
+  wet_free (content);
 }
 
 void

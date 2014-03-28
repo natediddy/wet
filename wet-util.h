@@ -20,8 +20,8 @@
 #ifndef WET_UTIL_H
 #define WET_UTIL_H
 
-#include <stdio.h>  /* snprintf() */
-#include <stdlib.h> /* exit(), EXIT_FAILURE */
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "wet.h"
 
@@ -58,6 +58,14 @@
     exit (EXIT_FAILURE); \
   } while (0)
 
+#define wet_free(p) \
+  do { \
+    if (!p) \
+      break; \
+    free (p); \
+    p = NULL; \
+  } while (0)
+
 void wet_print (int, const char *, const char *, ...);
 void wet_puts (const char *, ...);
 void wet_eputs (const char *, ...);
@@ -65,7 +73,7 @@ int wet_console_width (void);
 bool wet_streq (const char *, const char *);
 bool wet_streqi (const char *, const char *);
 int wet_str2int (const char *);
-size_t wet_str2size_t (const char *);
+size_t wet_str2size (const char *);
 char *wet_getenv (const char *);
 
 #endif /* WET_UTIL_H */

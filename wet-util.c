@@ -201,7 +201,7 @@ wet_str2int (const char *s)
 }
 
 size_t
-wet_str2size_t (const char *s)
+wet_str2size (const char *s)
 {
   size_t ret;
   unsigned long long n;

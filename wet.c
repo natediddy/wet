@@ -851,16 +851,11 @@ parse_opt (int c, char **v)
   }
 
   if (wet_streqi (v[1], "fc")) {
-    if (!v[2]) {
-      for (i = 0; i < WET_FORECAST_DAYS; ++i)
-        x.forecasts[i].all = true;
-      return;
-    }
     day = find_wanted_forecast_day (&c, v);
     for (i = 0; i < WET_FORECAST_DAYS; ++i) {
-      if ((day == -1) || (i == day)) {
-        if (!v[2])
-          x.forecasts[day].all = true;
+      if ((day == DAY_ALL) || (i == day)) {
+        if (day == DAY_ALL)
+          x.forecasts[i].all = true;
         else if (wet_streqi (v[2], "dow"))
           x.forecasts[i].day_of_week = true;
         else if (wet_streqi (v[2], "high"))
@@ -968,7 +963,7 @@ display (void)
     __display_wind (w.current_conditions.wind, true);
   } else if (x.location.all)
     wet_puts ("Location\n"
-              "------------"
+              "------------\n"
               "Name:      %s\n"
               "Latitude:  %s\n"
               "Longitude: %s\n",
@@ -1047,6 +1042,8 @@ display (void)
                   w.forecasts[day].night.chance_precip,
                   w.forecasts[day].night.humidity);
         __display_wind (w.forecasts[day].night.wind, true);
+        if ((day + 1) < WET_FORECAST_DAYS)
+          wet_putc ('\n');
       } else if (x.forecasts[day].day_of_week)
         wet_puts (w.forecasts[day].day_of_week);
       else if (x.forecasts[day].high)
