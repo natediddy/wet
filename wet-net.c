@@ -17,44 +17,45 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <errno.h> /* errno */
-#include <stdio.h> /* snprintf() */
-#include <stdlib.h> /* malloc(), realloc(), free() */
-#include <string.h> /* strlen(), strncpy(), strerror(), strstr(), strchr() */
-
-#include <curl/curl.h> /* curl_*, CURL* */
+#include <errno.h>
+#include <fcntl.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "wet.h"
 #include "wet-net.h"
 #include "wet-util.h"
 
-#define USERAGENT "WET (WEather Tool) / " WET_VERSION
+#define PORT               80
+#define HOST               "wxdata.weather.com"
+#define GET                "GET %s HTTP/1.1\r\nHost: " HOST "\r\n\r\n"
+#define WEATHER_DATA_PATH  "/wxdata/weather/local/%s?unit=%s&dayf=5&cc=*"
+#define WEATHER_LOCID_PATH "/wxdata/search/search?where=%s"
 
-#define WEATHER_DATA_URL \
-  "http://wxdata.weather.com/wxdata/weather/local/%s?unit=%s&dayf=5&cc=*"
+#define HEADER_DELIMITER "\r\n\r\n"
 
-#define WEATHER_LOCATION_SEARCH_URL \
-  "http://wxdata.weather.com/wxdata/search/search?where=%s"
+#define HEADERMAX    1024
+#define GETMAX        512
+#define URLPATHMAX    256
+#define STATUSTEXTMAX 128
 
 #define DATA_UNKNOWN      "(not found)"
 #define DATA_UNKNOWN_SIZE 12 /* includes null terminator */
 
-#define URL_MAX 256
-
-#define DIE_IF_ERROR          \
-  if (curlstatus != CURLE_OK) \
-    wet_die ("libcurl: %s", curl_easy_strerror (curlstatus))
-
-struct writedata {
-  char *buffer;
-  size_t n;
+struct headerdata {
+  int status;
+  size_t content_length;
+  char status_text[STATUSTEXTMAX];
 };
 
 static const char *encode_chars = "!@#$%^&*()=+{}[]|\\;':\",<>/? ";
-
-static struct writedata data = {NULL, 0};
-static CURLcode curlstatus   = CURLE_OK;
-static CURL *curlptr         = NULL;
+static char *content = NULL;
 
 #define __assign_unknown(__r) strncpy (__r, DATA_UNKNOWN, DATA_UNKNOWN_SIZE)
 
@@ -112,7 +113,7 @@ fill_weather_struct (struct weather *w)
   char *t3;
   bool use_unknown_string;
 
-  p = strstr (data.buffer, "<error>");
+  p = strstr (content, "<error>");
   if (p && *p) {
     p = p + strlen ("<error>");
     t0 = strstr (p, "<err type=\"");
@@ -129,18 +130,18 @@ fill_weather_struct (struct weather *w)
 
   use_unknown_string = false;
   /* units {{{ */
-  __find_and_assign (p, data.buffer, "<ut>", '<', w->units.temperature);
-  __find_and_assign (p, data.buffer, "<ud>", '<', w->units.distance);
-  __find_and_assign (p, data.buffer, "<us>", '<', w->units.speed);
-  __find_and_assign (p, data.buffer, "<up>", '<', w->units.pressure);
-  __find_and_assign (p, data.buffer, "<ur>", '<', w->units.rainfall);
+  __find_and_assign (p, content, "<ut>", '<', w->units.temperature);
+  __find_and_assign (p, content, "<ud>", '<', w->units.distance);
+  __find_and_assign (p, content, "<us>", '<', w->units.speed);
+  __find_and_assign (p, content, "<up>", '<', w->units.pressure);
+  __find_and_assign (p, content, "<ur>", '<', w->units.rainfall);
   /* }}} units */
 
 
 
   use_unknown_string = true;
   /* location {{{ */
-  p = strstr (data.buffer, "<loc id=");
+  p = strstr (content, "<loc id=");
   if (p && *p) {
     __find_and_assign (t0, p, "<dnam>", '<', w->location.name);
     __find_and_assign (t0, p, "<lat>", '<', w->location.lat);
@@ -155,7 +156,7 @@ fill_weather_struct (struct weather *w)
 
 
   /* current_conditions {{{ */
-  p = strstr (data.buffer, "<cc>");
+  p = strstr (content, "<cc>");
   if (p && *p) {
     __find_and_assign (t0, p, "<lsup>", '<',
                        w->current_conditions.last_updated);
@@ -231,7 +232,7 @@ fill_weather_struct (struct weather *w)
 
 
   /* forecasts {{{ */
-  p = strstr (data.buffer, "<dayf>");
+  p = strstr (content, "<dayf>");
   if (p && *p) {
     for (day = 0; day < WET_FORECAST_DAYS; ++day) {
       t0 = strstr (p, "<day d=");
@@ -354,93 +355,15 @@ fill_location_id (struct weather *w)
   char *p;
 
   use_unknown_string = false;
-  __find_and_assign (p, data.buffer, "<loc id=\"", '"', w->location_id);
+  __find_and_assign (p, content, "<loc id=\"", '"', w->location_id);
 }
 
 #undef __assign_unknown
 #undef __assign
 #undef __find_and_assign
 
-static size_t
-writefunction (void *buf, size_t size, size_t nmemb, void *data)
-{
-  size_t n;
-  struct writedata *p;
-
-  p = (struct writedata *) data;
-  n = size * nmemb;
-
-  p->buffer = (char *) realloc (p->buffer, p->n + n + 1);
-  if (!p->buffer)
-    return 0;
-
-  memcpy (&(p->buffer[p->n]), buf, n);
-  p->n += n;
-  p->buffer[p->n] = 0;
-  return n;
-}
-
 static void
-writedata_reset (void)
-{
-  if (data.buffer) {
-    free (data.buffer);
-    data.buffer = NULL;
-  }
-
-  data.buffer = (char *) malloc (sizeof (char));
-  if (!data.buffer)
-    wet_die (strerror (errno));
-  data.n = 0;
-}
-
-static void
-net_init (const char *url)
-{
-  curlptr = curl_easy_init ();
-  if (!curlptr) {
-    curlstatus = CURLE_FAILED_INIT;
-    DIE_IF_ERROR;
-  }
-
-  curlstatus = curl_easy_setopt (curlptr, CURLOPT_URL, url);
-  DIE_IF_ERROR;
-
-  curlstatus = curl_easy_setopt (curlptr, CURLOPT_USERAGENT, USERAGENT);
-  DIE_IF_ERROR;
-
-  curlstatus = curl_easy_setopt (curlptr, CURLOPT_FOLLOWLOCATION, 1L);
-  DIE_IF_ERROR;
-
-  writedata_reset ();
-  curlstatus = curl_easy_setopt (curlptr, CURLOPT_WRITEDATA, (void *) &data);
-  DIE_IF_ERROR;
-
-  curlstatus =
-    curl_easy_setopt (curlptr,
-                      CURLOPT_WRITEFUNCTION,
-                      (void *) &writefunction);
-  DIE_IF_ERROR;
-}
-
-static void
-net_finish (void)
-{
-  if (curlptr)
-    curl_easy_cleanup (curlptr);
-
-  if (data.buffer)
-    free (data.buffer);
-
-  curlptr = NULL;
-  data.buffer = NULL;
-
-  curlstatus = CURLE_OK;
-  data.n = 0;
-}
-
-static void
-net_encode_string (char *buffer, size_t max, const char *str)
+encode_string (char *buffer, size_t max, const char *str)
 {
   size_t n;
   size_t nstr;
@@ -484,40 +407,199 @@ net_encode_string (char *buffer, size_t max, const char *str)
   buffer[pos] = '\0';
 }
 
+static void
+retrieve_header (int sock, char *buffer, size_t n)
+{
+  bool stop;
+  size_t pos;
+  ssize_t n_read;
+
+  stop = false;
+  pos = 0;
+  buffer[0] = '\0';
+
+  while (!stop) {
+    n_read = read (sock, buffer + pos, 1);
+    if (n_read > 0) {
+      pos += n_read;
+      buffer[pos] = '\0';
+      if (strstr (buffer, HEADER_DELIMITER))
+        stop = true;
+      continue;
+    }
+    break;
+  }
+}
+
+static void
+read_header (struct headerdata *hd, const char *header)
+{
+  size_t i;
+  size_t j;
+  char status_buffer[64];
+  char content_length_buffer[64];
+  char *p;
+
+  hd->status = -1;
+  hd->content_length = 0;
+  hd->status_text[0] = '\0';
+
+  status_buffer[0] = '\0';
+  p = strstr (header, "HTTP/1.1 ");
+  if (p && *p) {
+    p = p + strlen ("HTTP/1.1 ");
+    j = 0;
+    for (i = 0; (p[i] && (p[i] != ' ')); ++i)
+      status_buffer[j++] = p[i];
+    status_buffer[j] = '\0';
+    hd->status = wet_str2int (status_buffer);
+    if (p[i] == ' ')
+      ++i;
+    j = 0;
+    for (; (p[i] && (p[i] != '\r')); ++i)
+      hd->status_text[j++] = p[i];
+    hd->status_text[j] = '\0';
+  }
+
+  content_length_buffer[0] = '\0';
+  p = strstr (header, "Content-Length:");
+  if (p && *p) {
+    p = p + strlen ("Content-Length:");
+    while (*p && (*p == ' '))
+      p++;
+    j = 0;
+    for (i = 0; (p[i] && (p[i] != '\r')); ++i)
+      content_length_buffer[j++] = p[i];
+    content_length_buffer[j] = '\0';
+    hd->content_length = wet_str2size_t (content_length_buffer);
+  }
+}
+
+static void
+retrieve_content (int sock, ssize_t n)
+{
+  bool stop;
+  size_t pos;
+  ssize_t n_read;
+
+  stop = false;
+  pos = 0;
+  content[0] = '\0';
+
+  while (!stop) {
+    n_read = read (sock, content + pos, 1);
+    if (n_read > 0) {
+      pos += n_read;
+      content[pos] = '\0';
+      if (pos >= n)
+        stop = true;
+      continue;
+    }
+    break;
+  }
+}
+
+static void
+http_get_request (const char *path)
+{
+  int sock;
+  long n_haddr;
+  ssize_t n_write;
+  char get[GETMAX];
+  char header[HEADERMAX];
+  struct sockaddr_in a;
+  struct headerdata hd;
+  struct hostent *h;
+
+  sock = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (sock == -1)
+    wet_die ("failed to create socket: %s", strerror (errno));
+
+  h = gethostbyname (HOST);
+  if (!h) {
+    close (sock);
+    wet_die ("failed to get host information");
+  }
+
+  memcpy (&n_haddr, h->h_addr, h->h_length);
+  a.sin_addr.s_addr = n_haddr;
+  a.sin_port = htons (PORT);
+  a.sin_family = AF_INET;
+
+  wet_debug ("connecting to: \"%s%s\"", HOST, path);
+  if (connect (sock, (struct sockaddr *) &a, sizeof (a)) == -1) {
+    close (sock);
+    wet_die ("failed to connect socket: %s", strerror (errno));
+  }
+
+  snprintf (get, GETMAX, GET, path);
+
+  n_write = write (sock, get, strlen (get));
+  if (n_write < 0) {
+    close (sock);
+    wet_die ("failed to send GET request: %s", strerror (errno));
+  }
+
+  retrieve_header (sock, header, HEADERMAX);
+  memset (&hd, 0, sizeof (struct headerdata));
+  read_header (&hd, header);
+
+  wet_debug ("http status: %i (%s)", hd.status, hd.status_text);
+  if (hd.status != 200) {
+    close (sock);
+    wet_die ("http: %i (%s)", hd.status, hd.status_text);
+  }
+
+  if (content) {
+    free (content);
+    content = NULL;
+  }
+
+  content = (char *) malloc (hd.content_length + 1);
+  if (!content) {
+    close (sock);
+    wet_die ("failed to allocate memory: %s", strerror (errno));
+  }
+
+  retrieve_content (sock, hd.content_length);
+  close (sock);
+}
+
+static void
+cleanup (void)
+{
+  if (content) {
+    free (content);
+    content = NULL;
+  }
+}
+
 void
 wet_net_get_weather_data (struct weather *w, bool metric)
 {
-  char url[URL_MAX];
+  char path[URLPATHMAX];
 
-  snprintf (url, URL_MAX, WEATHER_DATA_URL,
+  snprintf (path, URLPATHMAX, WEATHER_DATA_PATH,
             w->location_id, (!metric) ? "" : "m");
-  net_init (url);
-  curlstatus = curl_easy_perform (curlptr);
-  DIE_IF_ERROR;
+  http_get_request (path);
   fill_weather_struct (w);
-  net_finish ();
 }
 
 void
 wet_net_get_location_id (struct weather *w, const char *query)
 {
   size_t n;
-  size_t ne;
-  char url[URL_MAX];
+  char path[URLPATHMAX];
 
-  n = strlen (query);
   /* Make equery extra extra large just in case.
      wet_net_encode_string() does not do any safety checks... */
-  ne = n * 10;
-  char equery[ne];
+  n = strlen (query) * 10;
+  char equery[n];
 
-  net_encode_string (equery, ne, query);
-  snprintf (url, URL_MAX, WEATHER_LOCATION_SEARCH_URL, equery);
-
-  net_init (url);
-  curlstatus = curl_easy_perform (curlptr);
-  DIE_IF_ERROR;
+  atexit (cleanup);
+  encode_string (equery, n, query);
+  snprintf (path, URLPATHMAX, WEATHER_LOCID_PATH, equery);
+  http_get_request (path);
   fill_location_id (w);
-  net_finish ();
 }
 

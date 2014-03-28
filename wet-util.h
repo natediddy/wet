@@ -36,12 +36,11 @@
 # define wet_debug(...) \
   do { \
     char __tag[__WET_TAG_MAX]; \
-    snprintf (__tag, __WET_TAG_MAX, "%s:DEBUG:%s:%i:%s:", \
-              program_name, __FILE__, __LINE__, __func__); \
+    snprintf (__tag, __WET_TAG_MAX, "%s: DEBUG:", program_name); \
     wet_print (__WET_OUTPUT_STDOUT, __tag, __VA_ARGS__); \
   } while (0)
 #else
-# define wet_debug
+# define wet_debug(...)
 #endif
 
 #define wet_error(...) \
@@ -65,6 +64,8 @@ void wet_eputs (const char *, ...);
 int wet_console_width (void);
 bool wet_streq (const char *, const char *);
 bool wet_streqi (const char *, const char *);
+int wet_str2int (const char *);
+size_t wet_str2size_t (const char *);
 char *wet_getenv (const char *);
 
 #endif /* WET_UTIL_H */

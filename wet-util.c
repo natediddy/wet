@@ -17,21 +17,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <ctype.h> /* tolower() */
-#include <stdarg.h> /* va_* */
-#include <string.h> /* memcmp(), strlen(), strchr() */
+#include <ctype.h>
+#include <limits.h> /* INT_MIN and INT_MAX */
+#include <stdarg.h>
+#include <stdint.h> /* SIZE_MAX */
+#include <string.h>
 #ifdef _WIN32
-# include <windows.h> /* CONSOLE_SCREEN_BUFFER_INFO,
-                         GetConsoleScreenBufferInfo(), GetStdHandle(),
-                         GetEnvironmentVariable() */
+# include <windows.h>
 #else
-# include <sys/ioctl.h> /* ioctl() */
-# include <unistd.h> /* STDOUT_FILENO, TIOCGWINSZ */
+# include <sys/ioctl.h>
+# include <unistd.h>
 #endif
 
-#include "wet-util.h" /* includes <stdio.h>  - stdout, stderr, fputs(),
-                                               fputc(), vfprintf()
-                         includes <stdlib.h> - getenv() */
+#include "wet-util.h"
 
 #define DEFAULT_CONSOLE_WIDTH 80
 
@@ -132,6 +130,89 @@ wet_streqi(const char *s1, const char *s2)
   *l = '\0';
 
   return (memcmp (l1, l2, n) == 0);
+}
+
+static long long
+str2ll (const char *s)
+{
+  int sign;
+  long long n;
+  long long g;
+
+  n = 0ll;
+  if (s && *s) {
+    g = 0ll;
+    sign = 1;
+    while (isspace (*s))
+      s++;
+    if (*s == '-')
+      sign = -1;
+    while (*s) {
+      if (isdigit (*s)) {
+        g = g * 10ll + *s++ - '0';
+        continue;
+      }
+      s++;
+    }
+    n = g * sign;
+  }
+  return n;
+}
+
+static unsigned long long
+str2ull (const char *s)
+{
+  unsigned long long n;
+  unsigned long long g;
+
+  n = 0llu;
+  if (s && *s) {
+    g = 0llu;
+    while (isspace (*s))
+      s++;
+    while (*s) {
+      if (isdigit (*s)) {
+        g = g * 10llu + *s++ - '0';
+        continue;
+      }
+      s++;
+    }
+    n = g;
+  }
+  return n;
+}
+
+int
+wet_str2int (const char *s)
+{
+  int ret;
+  long long n;
+
+  n = str2ll (s);
+
+  if (n > INT_MAX)
+    ret = INT_MAX;
+  else if (n < INT_MIN)
+    ret = INT_MIN;
+  else
+    ret = (int) n;
+
+  return ret;
+}
+
+size_t
+wet_str2size_t (const char *s)
+{
+  size_t ret;
+  unsigned long long n;
+
+  n = str2ull (s);
+
+  if (n > SIZE_MAX)
+    ret = SIZE_MAX;
+  else
+    ret = (size_t) n;
+  return ret;
 }
 
 char *

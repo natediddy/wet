@@ -21,7 +21,7 @@
 #define WET_H
 
 #define WET_PROGRAM_NAME "wet"
-#define WET_VERSION      "1.0"
+#define WET_VERSION      "1.5"
 
 #ifndef __cplusplus
 typedef signed char bool;

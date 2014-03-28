@@ -26,16 +26,16 @@
 
 #define UNIT_BUFFER_MAX          WET_DATA_MAX
 #define DEFAULT_CONSOLE_WIDTH    80
-#define HELP_COMMAND_LEAD_SPACES 2
-#define HELP_TEXT_LEAD_SPACES    8
-
+#define HELP_COMMAND_LEAD_SPACES 1
+#define HELP_TEXT_LEAD_SPACES    4
 
 enum {
   DAY_0,
   DAY_1,
   DAY_2,
   DAY_3,
-  DAY_4
+  DAY_4,
+  DAY_ALL
 };
 
 struct __wind_display_opts {
@@ -101,6 +101,7 @@ static const char *loc_options[] = {
 
 /* specific day options for "fc" command */
 static const char *fc_day_options[] = {
+  "all",
   "1", "today", /* this one is implied if no day option is given */
   "2", "tomorrow",
   "3",
@@ -112,8 +113,8 @@ static const char *fc_day_options[] = {
 /* options for "fc" command (this has to include day options as well) */
 static const char *fc_options[] = {
   "dow",
-  "high",
-  "low",
+  "high", "hi",
+  "low", "lo",
   "sunset",
   "sunrise",
   "text",
@@ -121,6 +122,7 @@ static const char *fc_options[] = {
   "humidity",
   "wind",
   "night",
+  "all",
   "1", "today",
   "2", "tomorrow",
   "3",
@@ -213,38 +215,29 @@ usage (bool error)
 }
 
 static void
-print_help_cmd (const char *command, const char *text, ...)
+print_leadspace (int n)
+{
+  int i;
+
+  for (i = 0; i < n; ++i)
+    wet_putc (' ');
+}
+
+static void
+print_text (int leadspace, bool leadonfirstline, const char *text)
 {
   int c;
-  int max;
-  size_t n;
-  va_list ap;
+  int n;
   const char *p;
 
+  n = wet_console_width ();
 
-  for (c = 0; c < HELP_COMMAND_LEAD_SPACES; ++c)
-    wet_putc (' ');
+  if (leadonfirstline)
+    print_leadspace (leadspace);
 
-  wet_puts (program_name);
-  wet_putc (' ');
-  wet_puts (command);
-  wet_putc ('\n');
-
-  n = strlen (text);
-  /* make buffer twice the size of text just in case */
-  char buffer[n * 2];
-
-  va_start (ap, text);
-  vsnprintf (buffer, n * 2, text, ap);
-  va_end (ap);
-
-  for (c = 0; c < HELP_TEXT_LEAD_SPACES; ++c)
-    wet_putc (' ');
-
-  max = wet_console_width ();
-  for (p = buffer; *p; ++p, ++c) {
+  for (c = leadspace, p = text; *p; ++c, ++p) {
     wet_putc (*p);
-    if (c == (max - 2)) {
+    if (c == (n - 2)) {
       if (*(p + 1) && (*p != ' ')) {
         if (*(p + 1) == ' ')
           ++p;
@@ -252,17 +245,58 @@ print_help_cmd (const char *command, const char *text, ...)
           wet_putc ('-');
       }
       wet_putc ('\n');
-      for (c = 0; c < HELP_TEXT_LEAD_SPACES; ++c)
-        wet_putc (' ');
+      print_leadspace (leadspace);
+      c = leadspace;
     }
   }
   wet_putc ('\n');
 }
 
 static void
+print_help_cmd (const char *command, const char *text, ...)
+{
+  size_t n;
+  va_list ap;
+
+
+  print_leadspace (HELP_COMMAND_LEAD_SPACES);
+  wet_puts (program_name);
+  wet_putc (' ');
+  wet_puts (command);
+  wet_putc ('\n');
+
+  n = strlen (text) * 2;
+  /* make buffer twice the size of text just in case */
+  char buffer[n];
+
+  va_start (ap, text);
+  vsnprintf (buffer, n, text, ap);
+  va_end (ap);
+  print_text (HELP_TEXT_LEAD_SPACES, true, buffer);
+}
+
+static void
+print_separator (void)
+{
+  int i;
+  int n;
+  int w;
+
+  w = wet_console_width ();
+  n = w / 4;
+  for (i = 0; i < n; ++i)
+    wet_putc ('-');
+  wet_putc ('\n');
+}
+
+static void
 help (const char *command, const char *option1)
 {
+  size_t n;
+
   if (!command) {
+    wet_puts ("Weather Tool (" WET_VERSION ") Main Options\n");
+    print_separator ();
     print_help_cmd ("cc", "Shows current conditions.");
     print_help_cmd ("loc", "Shows information about LOCATION.");
     print_help_cmd ("fc", "Shows forecast predictions.");
@@ -275,20 +309,28 @@ help (const char *command, const char *option1)
                     "default if no unit command is given.");
     print_help_cmd ("help",
                     "Shows help information and exits. Use `%s help COMMAND' "
-                    "for help with a specific command.",
+                    "for help with the specific COMMAND.",
                     program_name);
     print_help_cmd ("version",
                     "Shows the version information of this program.");
-    wet_puts ("If no option commands are given, a default set of basic "
-              "weather data will be displayed.\n");
-    wet_puts ("All weather data is obtained from www.weather.com.\n");
-    wet_puts ("NOTE: instead of providing a LOCATION argument every time\n"
-              "      the program is run, you can set the WET_LOCATION\n"
-              "      environment variable to your location (e.g.\n"
-              "      WET_LOCATION=\"new york city\").\n");
-    wet_puts ("NOTE: you can also set the WET_UNITS environment variable\n"
-              "      to your preferred set of units (e.g.\n"
-              "      WET_UNITS=imperial or WET_UNITS=metric).\n");
+    print_separator ();
+    print_text (0, false,
+                "If no option commands are given, a default set of basic "
+                "weather data will be displayed.");
+    wet_putc ('\n');
+    n = strlen ("NOTE: ");
+    print_text (n, false,
+                "NOTE: Instead of providing a LOCATION argument every time, "
+                "you can set the WET_LOCATION environment variable to your "
+                "desired location (e.g. WET_LOCATION=\"New York City\").");
+    wet_putc ('\n');
+    print_text (n, false,
+                "NOTE: You can also set the WET_UNITS environment variable "
+                "to your preferred set of units (e.g. WET_UNITS=imperial or "
+                "WET_UNITS=metric).");
+    wet_putc ('\n');
+    print_text (0, false,
+                "All weather data is obtained from www.weather.com.");
     return;
   }
 
@@ -339,6 +381,8 @@ help (const char *command, const char *option1)
         wet_die ("unknown option for `cc' -- `%s'", option1);
       return;
     }
+    wet_puts ("Weather Tool (" WET_VERSION ") Current Conditions Options\n");
+    print_separator ();
     print_help_cmd ("cc last-updated",
                     "Shows when the current conditions data was last "
                     "updated.");
@@ -367,8 +411,10 @@ help (const char *command, const char *option1)
                     "`%s help cc barometer' to see them).",
                     program_name);
     print_help_cmd ("cc wind", "Shows current wind conditions.");
-    wet_puts ("If none of the `cc' options are provided, then ALL current "
-              "conditions data will be displayed.\n");
+    print_separator ();
+    print_text (0, false,
+                "If none of the `cc' options are provided, then ALL current "
+                "conditions data will be displayed.");
     return;
   }
 
@@ -384,9 +430,12 @@ help (const char *command, const char *option1)
         wet_die ("unknown option for `loc' -- `%s'", option1);
       return;
     }
+    wet_puts ("Weather Tool (" WET_VERSION ") Location Options\n");
+    print_separator ();
     print_help_cmd ("loc latitude", "Shows the latitude of LOCATION.");
     print_help_cmd ("loc longitude", "Shows the longitude of LOCATION.");
     print_help_cmd ("loc name", "Shows the proper name of LOCATION.");
+    print_separator ();
     return;
   }
 
@@ -396,11 +445,15 @@ help (const char *command, const char *option1)
           wet_streqi (option1, "3") || wet_streqi (option1, "4") ||
           wet_streqi (option1, "5") || wet_streqi (option1, "today") ||
           wet_streqi (option1, "tomorrow"))
-        print_help_cmd ("fc [1-5]",
-                        "Shows forecast for a specific day out of a 5-day "
-                        "forecast (1=today, 2=tomorrow, etc.). If this "
+        print_help_cmd ("fc [1-5|today|tomorrow]",
+                        "Shows forecast data for a specific day out of a "
+                        "5 day forecast (1=today, 2=tomorrow, etc.). If this "
                         "option is not given, only the forecast data for "
                         "today will be used.");
+      else if (wet_streqi (option1, "all"))
+        print_help_cmd ("fc all",
+                        "Shows forecast data for all days in the 5 day "
+                        "forecast.");
       else if (wet_streqi (option1, "dow"))
         print_help_cmd ("fc dow",
                         "Shows the name for the day of the week of the "
@@ -433,12 +486,18 @@ help (const char *command, const char *option1)
                         "Shows the wind forecasts for the forecast day.");
       else
         wet_die ("unknown option for `fc' -- `%s'", option1);
+      return;
     }
-    print_help_cmd ("fc [1-5]",
-                    "Shows forecast for a specific day out of a 5 day "
+    wet_puts ("Weather Tool (" WET_VERSION ") Forecast Options\n");
+    print_separator ();
+    print_help_cmd ("fc [1-5|today|tomorrow]",
+                    "Shows forecast data for a specific day out of a 5 day "
                     "forecast (1=today, 2=tomorrow, etc.). If this option "
                     "is not given, only the forecast data for today will be "
                     "used.");
+    print_help_cmd ("fc all",
+                    "Shows forecast data for all days in the 5 day "
+                    "forecast.");
     print_help_cmd ("fc dow",
                     "Shows the name for the day of the week of the forecast "
                     "day.");
@@ -455,6 +514,7 @@ help (const char *command, const char *option1)
                     "options (use `%s help fc night' to see them).",
                     program_name);
     print_help_cmd ("fc wind", "Shows wind forecasts for the forecast day.");
+    print_separator ();
     return;
   }
 
@@ -655,7 +715,7 @@ find_wanted_forecast_day (int *c, char **v)
   size_t j;
 
   day = -1;
-  for (i = 2; v[2]; ++i) {
+  for (i = 1; v[i]; ++i) {
     if (wet_streq (v[i], "1") || wet_streqi (v[i], "today"))
       day = DAY_0;
     else if (wet_streq (v[i], "2") || wet_streqi (v[i], "tomorrow"))
@@ -666,6 +726,8 @@ find_wanted_forecast_day (int *c, char **v)
       day = DAY_3;
     else if (wet_streq (v[i], "5"))
       day = DAY_4;
+    else if (wet_streqi (v[i], "all"))
+      day = DAY_ALL;
     if (day != -1) {
       *c -= 1;
       for (j = i; v[j]; ++j)
@@ -673,6 +735,10 @@ find_wanted_forecast_day (int *c, char **v)
       break;
     }
   }
+
+  if (day == -1)
+    day = DAY_0;
+
   return day;
 }
 

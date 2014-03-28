@@ -7,7 +7,8 @@ by running:
 
     wet help
 
-And for a specific command, run:
+
+And for specific commands run:
 
     wet help [COMMAND]
 
@@ -16,8 +17,11 @@ And for a specific command, run:
 Compiling/Installing
 ---------------------
 
-In order to compile wet, you must make sure libcurl is installed on your
-system. From the project directory, run:
+To compile wet, from the project directory run:
 
     make
+
+
+And to install, also from the project directory run:
+
     sudo make install

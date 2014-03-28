@@ -5,7 +5,6 @@
 
 CC = gcc
 CFLAGS = -Wall -O2 -g -march=native -mtune=native
-LIBS = -lcurl
 
 TARGET = wet
 
