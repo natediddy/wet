@@ -26,7 +26,6 @@
 #include "wet-weather.h"
 
 #define UNIT_BUFFER_MAX          WET_DATA_MAX
-#define DEFAULT_CONSOLE_WIDTH    80
 #define HELP_COMMAND_LEAD_SPACES 1
 #define HELP_TEXT_LEAD_SPACES    4
 
@@ -37,22 +36,6 @@
 #define DAY3    (1 << 4)
 #define DAY4    (1 << 5)
 #define DAYALL  (1 << 6)
-
-#define FC_DAY_OPTS \
-  "all", \
-  "sunday", \
-  "monday", \
-  "tuesday", \
-  "wednesday", \
-  "thursday", \
-  "friday", \
-  "saturday", \
-  "1", "today", \
-  "2", "tomorrow", \
-  "3", \
-  "4", \
-  "5"
-
 
 const char *program_name;
 
@@ -71,8 +54,8 @@ static const char *main_command_options[] = {
 /* options for "cc" command */
 static const char *cc_options[] = {
   "last-updated",
-  "temp", "temperature",
-  "dewpoint",
+  "temp",
+  "dew-point",
   "text",
   "visibility",
   "humidity",
@@ -93,17 +76,32 @@ static const char *loc_options[] = {
   NULL
 };
 
+#define __FC_DAY_OPTS \
+  "all", \
+  "sunday", \
+  "monday", \
+  "tuesday", \
+  "wednesday", \
+  "thursday", \
+  "friday", \
+  "saturday", \
+  "1", "today", \
+  "2", "tomorrow", \
+  "3", \
+  "4", \
+  "5"
+
 /* specific day options for "fc" command */
 static const char *fc_day_options[] = {
-  FC_DAY_OPTS,
+  __FC_DAY_OPTS,
   NULL
 };
 
 /* options for "fc" command (this has to include day options as well) */
 static const char *fc_options[] = {
   "dow",
-  "high", "hi",
-  "low", "lo",
+  "high",
+  "low",
   "sunset",
   "sunrise",
   "text",
@@ -111,9 +109,11 @@ static const char *fc_options[] = {
   "humidity",
   "wind",
   "night",
-  FC_DAY_OPTS,
+  __FC_DAY_OPTS,
   NULL
 };
+
+#undef __FC_DAY_OPTS
 
 /* options for forecast_daypart_options */
 static const char *fc_night_options[] = {
@@ -591,12 +591,13 @@ find_wanted_location (int *c, char **v)
         is_fc_night_option (v[i]))
       continue;
     if (location)
-      wet_die (WET_EOP, "too many location arguments given");
+      wet_die (WET_ELOC, "too many location arguments given");
     location = v[i];
     /* remove the location argument from the array */
     *c -= 1;
     for (j = i; v[j]; ++j)
       v[j] = v[j + 1];
+    i--;
   }
 
   if (!location)
@@ -869,11 +870,27 @@ display (void)
 {
   int day;
 
+#define __display_uv(__u) \
+  do { \
+    wet_puts (__u.index); \
+    if (*__u.text) \
+      wet_puts (" (%s)", __u.text); \
+    wet_putc ('\n'); \
+  } while (0)
+
+#define __display_barometer(__b) \
+  do { \
+    wet_puts ("%s%s", __b.reading, w.units.rainfall); \
+    if (*__b.direction) \
+      wet_puts (" (%s)", __b.direction); \
+    wet_putc ('\n'); \
+  } while (0)
+
 #define __display_wind(__w) \
   do { \
     wet_puts ("%sº %s", __w.direction, __w.text); \
     if ((wet_str2int (__w.speed) != 0) && isdigit (*__w.speed)) \
-      wet_puts (" at %s%s", __w.speed, w.units.speed); \
+      wet_puts (" %s%s", __w.speed, w.units.speed); \
     if (!wet_streqi (__w.gust, "n/a")) \
       wet_puts (" (%s%s gusts)", __w.gust, w.units.speed); \
     wet_putc ('\n'); \
@@ -882,14 +899,13 @@ display (void)
   if (default_display) {
     wet_puts ("%s (%s, %s)\n"
               "%sº%s and %s (feels like %sº%s)\n"
-              "Today's high:    %sº%s\n"
-              "Today's low:     %sº%s\n"
-              "Visibility:      %s%s\n"
-              "Humidity:        %s%%\n"
-              "Dew Point:       %sº%s\n"
-              "Sunrise:         %s\n"
-              "Sunset:          %s\n"
-              "Wind Conditions: ",
+              "today's high    - %sº%s\n"
+              "today's low     - %sº%s\n"
+              "visibility      - %s%s\n"
+              "humidity        - %s%%\n"
+              "dew point       - %sº%s\n"
+              "sunrise         - %s\n"
+              "sunset          - %s\n",
               w.location.name, w.location.lat, w.location.lon,
               w.current_conditions.temperature, w.units.temperature,
               w.current_conditions.text, w.current_conditions.feels_like,
@@ -899,24 +915,28 @@ display (void)
               w.units.distance, w.current_conditions.humidity,
               w.current_conditions.dewpoint, w.units.temperature,
               w.forecasts[0].sunrise, w.forecasts[0].sunset);
+    wet_puts ("uv index        - ");
+    __display_uv (w.current_conditions.uv);
+    wet_puts ("pressure        - ");
+    __display_barometer (w.current_conditions.barometer);
+    wet_puts ("wind conditions - ");
     __display_wind (w.current_conditions.wind);
     return;
   }
 
   if (x.current_conditions.all) {
-    wet_puts ("Current Conditions - %s\n"
+    wet_puts ("Current Conditions for %s\n"
+              "%s\n"
               "----------------\n"
-              "Last Updated        %s\n"
-              "Temperature         %sº%s\n"
-              "Dew Point           %sº%s\n"
-              "Visibility          %s%s\n"
-              "Humidity            %s%%\n"
-              "Local Station       %s\n"
-              "Feels Like          %sº%s\n"
-              "Moon                %s\n"
-              "UV Index            %s (%s)\n"
-              "Barometric Pressure %s%s (%s)\n"
-              "Wind                ",
+              "last updated        - %s\n"
+              "temperature         - %sº%s\n"
+              "dew point           - %sº%s\n"
+              "visibility          - %s%s\n"
+              "humidity            - %s%%\n"
+              "local station       - %s\n"
+              "feels like          - %sº%s\n"
+              "moon                - %s\n",
+              w.location.name,
               w.current_conditions.text,
               w.current_conditions.last_updated,
               w.current_conditions.temperature, w.units.temperature,
@@ -925,19 +945,20 @@ display (void)
               w.current_conditions.humidity,
               w.current_conditions.station,
               w.current_conditions.feels_like, w.units.temperature,
-              w.current_conditions.moon_phase.text,
-              w.current_conditions.uv.index,
-              w.current_conditions.uv.text,
-              w.current_conditions.barometer.reading, w.units.rainfall,
-              w.current_conditions.barometer.direction);
+              w.current_conditions.moon_phase.text);
+    wet_puts ("uv index            - ");
+    __display_uv (w.current_conditions.uv);
+    wet_puts ("barometric pressure - ");
+    __display_barometer (w.current_conditions.barometer);
+    wet_puts ("wind                - ");
     __display_wind (w.current_conditions.wind);
   }
 
   if (x.location.all)
     wet_puts ("%s\n"
               "----------------\n"
-              "Latitude  %s\n"
-              "Longitude %s\n",
+              "latitude  - %s\n"
+              "longitude - %s\n",
               w.location.name,
               w.location.lat,
               w.location.lon);
@@ -979,15 +1000,15 @@ display (void)
     wet_puts ("current moon phase - %s\n",
               w.current_conditions.moon_phase.text);
 
-  if (x.current_conditions.uv)
-    wet_puts ("current uv index - %s (%s)\n",
-              w.current_conditions.uv.index, w.current_conditions.uv.text);
+  if (x.current_conditions.uv) {
+    wet_puts ("current uv index - ");
+    __display_uv (w.current_conditions.uv);
+  }
 
-  if (x.current_conditions.barometer)
-    wet_puts ("current barometric pressure - %s%s (%s)\n",
-              w.current_conditions.barometer.reading,
-              w.units.rainfall,
-              w.current_conditions.barometer.direction);
+  if (x.current_conditions.barometer) {
+    wet_puts ("current barometric pressure - ");
+    __display_barometer (w.current_conditions.barometer);
+  }
 
   if (x.location.lat)
     wet_puts ("latitude - %s\n", w.location.lat);

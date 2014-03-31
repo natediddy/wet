@@ -1,10 +1,10 @@
-.TH WET 1 "March 2014" "1.5.4" "User Commands"
+.TH WET 1 "March 2014" "1.5.5" "User Commands"
 .SH NAME
 wet - \fIWE\fPather \fIT\fPool
 .SH SYNOPSIS
 .nf
 .fam C
-\fBwet\fP [\fICOMMAND\fP [\fIOPTIONS\fP]] [\fBLOCATION\fP]
+\fBwet\fP [\fICOMMAND\fP [\fIOPTIONS\fP]] [\fILOCATION\fP]
 .fam T
 .fi
 .fam T
@@ -84,13 +84,13 @@ current wind conditions
 .RS
 .TP
 \fBlatitude\fP
-latitude of \fBLOCATION\fP
+latitude of \fILOCATION\fP
 .TP
 \fBlongitude\fP
-longitude of \fBLOCATION\fP
+longitude of \fILOCATION\fP
 .TP
 \fBname\fP
-name of \fBLOCATION\fP
+name of \fILOCATION\fP
 .RE
 .PP
 \fBfc\fP \fIOPTIONS\fP
@@ -153,8 +153,8 @@ There are 2 environment variables that can simplify use.
 .RS
 .TP
 \fBWET_LOCATION\fP
-set this to your desired \fBLOCATION\fP and you will no
-longer have to provide that \fBLOCATION\fP every time you
+set this to your desired \fILOCATION\fP and you will no
+longer have to provide that \fILOCATION\fP every time you
 execute this program (unless overridden on the command line)
 .TP
 \fBWET_UNITS\fP
@@ -169,7 +169,7 @@ success
 a problem concerning command line options occurred
 .TP
 \fB2\fP
-a problem concerning \fBLOCATION\fP occurred (e.g. it was neither given on the
+a problem concerning \fILOCATION\fP occurred (e.g. it was neither given on the
 command line nor \fBWET_LOCATION\fP, or too many were given)
 .TP
 \fB3\fP
@@ -179,11 +179,11 @@ a problem concerning the network occurred
 a problem concerning the system occurred
 .TP
 \fB5\fP
-a problem concerning the weather data occurred (e.g. \fBLOCATION\fP was
+a problem concerning the weather data occurred (e.g. \fILOCATION\fP was
 invalid and could not be determined)
 .SH EXAMPLE
 For the sake of clarity, all of the below examples assume you want
-\fBLOCATION\fP to be New York, NY USA (zip code: 10001).
+\fILOCATION\fP to be New York, NY USA (zip code: 10001).
 .PP
 To be presented with a basic set of weather data, just run with no options:
 .PP
@@ -193,7 +193,7 @@ To be presented with a basic set of weather data, just run with no options:
 
 .fam T
 .fi
-The \fBLOCATION\fP argument may be a standard zip code or a string
+The \fILOCATION\fP argument may be a standard zip code or a string
 representation:
 .PP
 .nf
@@ -202,7 +202,7 @@ representation:
 
 .fam T
 .fi
-If you do not wish to provide a \fBLOCATION\fP every time, set the
+If you do not wish to provide a \fILOCATION\fP every time, set the
 \fBWET_LOCATION\fP environment variable:
 .PP
 .nf
@@ -221,7 +221,7 @@ variable:
 .fam T
 .fi
 Now all future executions of wet (in the current shell) without a
-\fBLOCATION\fP will use $\fBWET_LOCATION\fP, and the same with
+\fILOCATION\fP will use $\fBWET_LOCATION\fP, and the same with
 $\fBWET_UNITS\fP.
 .PP
 For a more permanent solution, you may want to add something like the

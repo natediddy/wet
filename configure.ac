@@ -1,6 +1,6 @@
 AC_INIT(
   [wet],
-  [1.5.4],
+  [1.5.5],
   [sforbes41@gmail.com],
   [wet],
   [https://github.com/natediddy/wet],

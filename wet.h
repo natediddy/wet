@@ -33,7 +33,7 @@
 #ifdef PACKAGE_VERSION
 # define WET_VERSION PACKAGE_VERSION
 #else
-# define WET_VERSION "1.5.4"
+# define WET_VERSION "1.5.5"
 #endif
 
 #ifdef HAVE_STDBOOL_H
