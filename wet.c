@@ -30,22 +30,29 @@
 #define HELP_COMMAND_LEAD_SPACES 1
 #define HELP_TEXT_LEAD_SPACES    4
 
-enum {
-  DAY_0,
-  DAY_1,
-  DAY_2,
-  DAY_3,
-  DAY_4,
-  DAY_ALL
-};
+#define DAYMASK 0
+#define DAY0    (1 << 1)
+#define DAY1    (1 << 2)
+#define DAY2    (1 << 3)
+#define DAY3    (1 << 4)
+#define DAY4    (1 << 5)
+#define DAYALL  (1 << 6)
 
-struct __wind_display_opts {
-  bool all;
-  bool gust;
-  bool direction;
-  bool speed;
-  bool text;
-};
+#define FC_DAY_OPTS \
+  "all", \
+  "sunday", \
+  "monday", \
+  "tuesday", \
+  "wednesday", \
+  "thursday", \
+  "friday", \
+  "saturday", \
+  "1", "today", \
+  "2", "tomorrow", \
+  "3", \
+  "4", \
+  "5"
+
 
 const char *program_name;
 
@@ -64,7 +71,7 @@ static const char *main_command_options[] = {
 /* options for "cc" command */
 static const char *cc_options[] = {
   "last-updated",
-  "temp",
+  "temp", "temperature",
   "dewpoint",
   "text",
   "visibility",
@@ -78,20 +85,6 @@ static const char *cc_options[] = {
   NULL
 };
 
-/* options for "uv" option */
-static const char *cc_uv_options[] = {
-  "index",
-  "text",
-  NULL
-};
-
-/* options for "barometer" option */
-static const char *cc_barometer_options[] = {
-  "direction",
-  "reading",
-  NULL
-};
-
 /* options for "loc" command */
 static const char *loc_options[] = {
   "latitude",
@@ -102,12 +95,7 @@ static const char *loc_options[] = {
 
 /* specific day options for "fc" command */
 static const char *fc_day_options[] = {
-  "all",
-  "1", "today", /* this one is implied if no day option is given */
-  "2", "tomorrow",
-  "3",
-  "4",
-  "5",
+  FC_DAY_OPTS,
   NULL
 };
 
@@ -123,12 +111,7 @@ static const char *fc_options[] = {
   "humidity",
   "wind",
   "night",
-  "all",
-  "1", "today",
-  "2", "tomorrow",
-  "3",
-  "4",
-  "5",
+  FC_DAY_OPTS,
   NULL
 };
 
@@ -141,11 +124,12 @@ static const char *fc_night_options[] = {
   NULL
 };
 
-static char *         location        = NULL;
-static bool           metric          = true;
-static bool           default_display = false;
+static char *location = NULL;
+static bool metric = true;
+static bool default_display = false;
 static struct weather w;
 
+/* make this an almost mirror image of struct weather */
 static struct {
   bool location_id;
 
@@ -159,23 +143,10 @@ static struct {
     bool humidity;
     bool station;
     bool feels_like;
-    struct __wind_display_opts wind;
-
-    struct {
-      bool text;
-    } moon_phase;
-
-    struct {
-      bool all;
-      bool index;
-      bool text;
-    } uv;
-
-    struct {
-      bool all;
-      bool direction;
-      bool reading;
-    } barometer;
+    bool wind;
+    bool moon_phase;
+    bool uv;
+    bool barometer;
   } current_conditions;
 
   struct {
@@ -195,14 +166,14 @@ static struct {
     bool text;
     bool chance_precip;
     bool humidity;
-    struct __wind_display_opts wind;
+    bool wind;
 
     struct {
       bool all;
       bool text;
       bool chance_precip;
       bool humidity;
-      struct __wind_display_opts wind;
+      bool wind;
     } night;
   } forecasts[WET_FORECAST_DAYS];
 } x;
@@ -373,7 +344,7 @@ help (const char *command, const char *option1)
       else if (wet_streqi (option1, "wind"))
         print_help_cmd ("cc wind", "Shows current wind conditions.");
       else
-        wet_die ("unknown option for `cc' -- `%s'", option1);
+        wet_die (WET_EOP, "unknown option for `cc' -- `%s'", option1);
       return;
     }
     wet_puts ("Weather Tool (" WET_VERSION ") Current Conditions Options\n");
@@ -416,7 +387,7 @@ help (const char *command, const char *option1)
       else if (wet_streqi (option1, "name"))
         print_help_cmd ("loc name", "Shows the proper name of LOCATION.");
       else
-        wet_die ("unknown option for `loc' -- `%s'", option1);
+        wet_die (WET_EOP, "unknown option for `loc' -- `%s'", option1);
       return;
     }
     wet_puts ("Weather Tool (" WET_VERSION ") Location Options\n");
@@ -448,7 +419,8 @@ help (const char *command, const char *option1)
                         "Shows the name for the day of the week of the "
                         "forecast day.");
       else if (wet_streqi (option1, "high"))
-        print_help_cmd ("fc high", "Shows the highest forecasted temperature.");
+        print_help_cmd ("fc high",
+                        "Shows the highest forecasted temperature.");
       else if (wet_streqi (option1, "low"))
         print_help_cmd ("fc low", "Shows the lowest forecasted temperature.");
       else if (wet_streqi (option1, "sunrise"))
@@ -456,7 +428,8 @@ help (const char *command, const char *option1)
       else if (wet_streqi (option1, "sunset"))
         print_help_cmd ("fc sunset", "Shows the time of sunset.");
       else if (wet_streqi (option1, "text"))
-        print_help_cmd ("fc text", "Shows a brief description of the forecast.");
+        print_help_cmd ("fc text",
+                        "Shows a brief description of the forecast.");
       else if (wet_streqi (option1, "cop"))
         print_help_cmd ("fc cop", "Shows the chance of precipitation.");
       else if (wet_streqi (option1, "humidity"))
@@ -474,7 +447,7 @@ help (const char *command, const char *option1)
         print_help_cmd ("fc wind",
                         "Shows the wind forecasts for the forecast day.");
       else
-        wet_die ("unknown option for `fc' -- `%s'", option1);
+        wet_die (WET_EOP, "unknown option for `fc' -- `%s'", option1);
       return;
     }
     wet_puts ("Weather Tool (" WET_VERSION ") Forecast Options\n");
@@ -507,7 +480,7 @@ help (const char *command, const char *option1)
     return;
   }
 
-  wet_die ("unknown command -- `%s'", command);
+  wet_die (WET_EOP, "unknown command -- `%s'", command);
 }
 
 static void
@@ -515,19 +488,13 @@ version (void)
 {
   wet_puts (WET_PROGRAM_NAME " (WEather Tool) " WET_VERSION "\n"
             "Written by Nathan Forbes (2014)\n");
-  exit (EXIT_SUCCESS);
+  exit (WET_ESUCCESS);
 }
 
 static void
 init_display_opts (void)
 {
   int i;
-#define __init_wind(__w) \
-  __w.all = false; \
-  __w.gust = false; \
-  __w.direction = false; \
-  __w.speed = false; \
-  __w.text = false
 
   x.current_conditions.all = false;
   x.current_conditions.last_updated = false;
@@ -538,14 +505,11 @@ init_display_opts (void)
   x.current_conditions.humidity = false;
   x.current_conditions.station = false;
   x.current_conditions.feels_like = false;
-  x.current_conditions.moon_phase.text = false;
-  x.current_conditions.uv.all = false;
-  x.current_conditions.uv.index = false;
-  x.current_conditions.uv.text = false;
-  x.current_conditions.barometer.all = false;
-  x.current_conditions.barometer.direction = false;
-  x.current_conditions.barometer.reading = false;
-  __init_wind (x.current_conditions.wind);
+  x.current_conditions.moon_phase = false;
+  x.current_conditions.uv = false;
+  x.current_conditions.barometer = false;
+  x.current_conditions.wind = false;
+
   x.location.all = false;
   x.location.lat = false;
   x.location.lon = false;
@@ -561,14 +525,13 @@ init_display_opts (void)
     x.forecasts[i].text = false;
     x.forecasts[i].chance_precip = false;
     x.forecasts[i].humidity = false;
-    __init_wind (x.forecasts[i].wind);
+    x.forecasts[i].wind = false;
     x.forecasts[i].night.all = false;
     x.forecasts[i].night.text = false;
     x.forecasts[i].night.chance_precip = false;
     x.forecasts[i].night.humidity = false;
-    __init_wind (x.forecasts[i].night.wind);
+    x.forecasts[i].night.wind = false;
   }
-#undef __init_wind
 }
 
 #define __is_option_func_body(__o, __a) \
@@ -588,18 +551,6 @@ static bool
 is_cc_option (const char *opt)
 {
   __is_option_func_body (opt, cc_options);
-}
-
-static bool
-is_cc_uv_option (const char *opt)
-{
-  __is_option_func_body (opt, cc_uv_options);
-}
-
-static bool
-is_cc_barometer_option (const char *opt)
-{
-  __is_option_func_body (opt, cc_barometer_options);
 }
 
 static bool
@@ -636,12 +587,11 @@ find_wanted_location (int *c, char **v)
 
   for (i = 1; v[i]; ++i) {
     if (is_main_command_option (v[i]) || is_cc_option (v[i]) ||
-        is_cc_uv_option (v[i]) || is_cc_barometer_option (v[i]) ||
         is_loc_option (v[i]) || is_fc_option (v[i]) ||
-        is_fc_day_option (v[i]) || is_fc_night_option (v[i]))
+        is_fc_night_option (v[i]))
       continue;
     if (location)
-      wet_die ("too many location arguments given");
+      wet_die (WET_EOP, "too many location arguments given");
     location = v[i];
     /* remove the location argument from the array */
     *c -= 1;
@@ -653,8 +603,7 @@ find_wanted_location (int *c, char **v)
     location = wet_getenv ("WET_LOCATION");
 
   if (!location || !*location)
-    wet_die ("no location given and WET_LOCATION environment variable not "
-             "set");
+    wet_die (WET_ELOC, "no location given and WET_LOCATION not set");
 }
 
 static void
@@ -697,36 +646,36 @@ find_wanted_units (int *c, char **v)
 }
 
 static int
-find_wanted_forecast_day (int *c, char **v)
+find_wanted_forecast_days (int *c, char **v)
 {
   int day;
   size_t i;
   size_t j;
 
-  day = -1;
+  day = DAYMASK;
   for (i = 1; v[i]; ++i) {
-    if (wet_streq (v[i], "1") || wet_streqi (v[i], "today"))
-      day = DAY_0;
-    else if (wet_streq (v[i], "2") || wet_streqi (v[i], "tomorrow"))
-      day = DAY_1;
-    else if (wet_streq (v[i], "3"))
-      day = DAY_2;
-    else if (wet_streq (v[i], "4"))
-      day = DAY_3;
-    else if (wet_streq (v[i], "5"))
-      day = DAY_4;
-    else if (wet_streqi (v[i], "all"))
-      day = DAY_ALL;
-    if (day != -1) {
+    if (is_fc_day_option (v[i])) {
+      if (wet_streq (v[i], "1") || wet_streqi (v[i], "today"))
+        day |= DAY0;
+      else if (wet_streq (v[i], "2") || wet_streqi (v[i], "tomorrow"))
+        day |= DAY1;
+      else if (wet_streq (v[i], "3"))
+        day |= DAY2;
+      else if (wet_streq (v[i], "4"))
+        day |= DAY3;
+      else if (wet_streq (v[i], "5"))
+        day |= DAY4;
+      else if (wet_streqi (v[i], "all"))
+        day |= DAYALL;
       *c -= 1;
       for (j = i; v[j]; ++j)
         v[j] = v[j + 1];
-      break;
+      i--;
     }
   }
 
-  if (day == -1)
-    day = DAY_0;
+  if (day == DAYMASK)
+    day |= DAY0;
 
   return day;
 }
@@ -747,7 +696,7 @@ parse_opt (int c, char **v)
   if (c == 1) {
     if (!location) {
       usage (true);
-      exit (EXIT_FAILURE);
+      exit (WET_ELOC);
     }
     default_display = true;
     return;
@@ -755,19 +704,19 @@ parse_opt (int c, char **v)
 
   if (wet_streqi (v[1], "help")) {
     if (c > 4)
-      wet_die ("too many arguments for `help'");
+      wet_die (WET_EOP, "too many arguments for `help'");
     else if (c == 4)
       help (v[2], v[3]);
     else if (c == 3)
       help (v[2], NULL);
     else
       help (NULL, NULL);
-    exit (EXIT_SUCCESS);
+    exit (WET_ESUCCESS);
   }
 
   if (wet_streqi (v[1], "version")) {
     if (c > 2)
-      wet_die ("too many arguments for `version'");
+      wet_die (WET_EOP, "too many arguments for `version'");
     version ();
   }
 
@@ -796,15 +745,15 @@ parse_opt (int c, char **v)
       else if (wet_streqi (v[i], "feels-like"))
         x.current_conditions.feels_like = true;
       else if (wet_streqi (v[i], "wind"))
-        x.current_conditions.wind.all = true;
+        x.current_conditions.wind = true;
       else if (wet_streqi (v[i], "moon"))
-        x.current_conditions.moon_phase.text = true;
+        x.current_conditions.moon_phase = true;
       else if (wet_streqi (v[i], "uv"))
-        x.current_conditions.uv.all = true;
+        x.current_conditions.uv = true;
       else if (wet_streqi (v[i], "barometer"))
-        x.current_conditions.barometer.all = true;
+        x.current_conditions.barometer = true;
       else
-        wet_die ("unknown `cc' option -- `%s'", v[i]);
+        wet_die (WET_EOP, "unknown `cc' option -- `%s'", v[i]);
     }
     return;
   }
@@ -822,25 +771,31 @@ parse_opt (int c, char **v)
       else if (wet_streqi (v[i], "name"))
         x.location.name = true;
       else
-        wet_die ("unknown `loc' option -- `%s'", v[i]);
+        wet_die (WET_EOP, "unknown `loc' option -- `%s'", v[i]);
     }
     return;
   }
 
+#define __is_specified_day(__d, __i) \
+  (__d & DAYALL) || \
+   (((__d & DAY0) && (__i == 0)) || \
+    ((__d & DAY1) && (__i == 1)) || \
+    ((__d & DAY2) && (__i == 2)) || \
+    ((__d & DAY3) && (__i == 3)) || \
+    ((__d & DAY4) && (__i == 4)))
+
   if (wet_streqi (v[1], "fc")) {
-    day = find_wanted_forecast_day (&c, v);
+    day = find_wanted_forecast_days (&c, v);
     if (!v[2]) {
-      x.forecasts[DAY_0].all = true;
+      for (i = 0; i < WET_FORECAST_DAYS; ++i)
+        if (__is_specified_day (day, i))
+          x.forecasts[i].all = true;
       return;
     }
     for (i = 2; v[i]; ++i) {
       for (j = 0; j < WET_FORECAST_DAYS; ++j) {
-        if ((day == DAY_ALL) || (j == day)) {
-          if (day == DAY_ALL) {
-            x.forecasts[j].all = true;
-            continue;
-          }
-          else if (wet_streqi (v[i], "dow"))
+        if (__is_specified_day (day, j)) {
+          if (wet_streqi (v[i], "dow"))
             x.forecasts[j].day_of_week = true;
           else if (wet_streqi (v[i], "high"))
             x.forecasts[j].high = true;
@@ -857,7 +812,7 @@ parse_opt (int c, char **v)
           else if (wet_streqi (v[i], "humidity"))
             x.forecasts[j].humidity = true;
           else if (wet_streqi (v[i], "wind"))
-            x.forecasts[j].wind.all = true;
+            x.forecasts[j].wind = true;
           else if (wet_streqi (v[i], "night")) {
             if (!v[i + 1]) {
               x.forecasts[j].night.all = true;
@@ -871,16 +826,19 @@ parse_opt (int c, char **v)
               else if (wet_streqi (v[k], "humidity"))
                 x.forecasts[j].night.humidity = true;
               else if (wet_streqi (v[k], "wind"))
-                x.forecasts[j].night.wind.all = true;
+                x.forecasts[j].night.wind = true;
               else
-                wet_die ("unknown `fc night' option -- `%s'", v[k]);
+                wet_die (WET_EOP, "unknown `fc night' option -- `%s'", v[k]);
+              i = k;
             }
-            i = k;
-          }
+          } else
+            wet_die (WET_EOP, "unknown `fc' option -- `%s'", v[i]);
         }
       }
     }
   }
+
+#undef __is_specified_day
 }
 
 static void
@@ -888,7 +846,7 @@ print_forecast_data (int day, bool night, const char *text, ...)
 {
   va_list ap;
 
-  if (day == DAY_0) {
+  if (day == 0) {
     if (night)
       wet_puts ("tonight");
     else
@@ -915,9 +873,9 @@ display (void)
   do { \
     wet_puts ("%sº %s", __w.direction, __w.text); \
     if ((wet_str2int (__w.speed) != 0) && isdigit (*__w.speed)) \
-      wet_puts (" %s%s", __w.speed, w.units.speed); \
+      wet_puts (" at %s%s", __w.speed, w.units.speed); \
     if (!wet_streqi (__w.gust, "n/a")) \
-      wet_puts (" (gusts %s%s)", __w.gust, w.units.speed); \
+      wet_puts (" (%s%s gusts)", __w.gust, w.units.speed); \
     wet_putc ('\n'); \
   } while (0)
 
@@ -935,30 +893,30 @@ display (void)
               w.location.name, w.location.lat, w.location.lon,
               w.current_conditions.temperature, w.units.temperature,
               w.current_conditions.text, w.current_conditions.feels_like,
-              w.units.temperature, w.forecasts[DAY_0].high,
-              w.units.temperature, w.forecasts[DAY_0].low,
+              w.units.temperature, w.forecasts[0].high,
+              w.units.temperature, w.forecasts[0].low,
               w.units.temperature, w.current_conditions.visibility,
               w.units.distance, w.current_conditions.humidity,
               w.current_conditions.dewpoint, w.units.temperature,
-              w.forecasts[DAY_0].sunrise, w.forecasts[DAY_0].sunset);
+              w.forecasts[0].sunrise, w.forecasts[0].sunset);
     __display_wind (w.current_conditions.wind);
     return;
   }
 
   if (x.current_conditions.all) {
-    wet_puts ("Current Conditions (%s)\n"
-              "-----------------------------\n"
-              "Last Updated:        %s\n"
-              "Temperature:         %sº%s\n"
-              "Dew Point:           %sº%s\n"
-              "Visibility:          %s%s\n"
-              "Humidity:            %s%%\n"
-              "Local Station:       %s\n"
-              "Feels Like:          %sº%s\n"
-              "Moon:                %s\n"
-              "UV Index:            %s (%s)\n"
-              "Barometric Pressure: %s%s (%s)\n"
-              "Wind:                ",
+    wet_puts ("Current Conditions - %s\n"
+              "----------------\n"
+              "Last Updated        %s\n"
+              "Temperature         %sº%s\n"
+              "Dew Point           %sº%s\n"
+              "Visibility          %s%s\n"
+              "Humidity            %s%%\n"
+              "Local Station       %s\n"
+              "Feels Like          %sº%s\n"
+              "Moon                %s\n"
+              "UV Index            %s (%s)\n"
+              "Barometric Pressure %s%s (%s)\n"
+              "Wind                ",
               w.current_conditions.text,
               w.current_conditions.last_updated,
               w.current_conditions.temperature, w.units.temperature,
@@ -976,82 +934,89 @@ display (void)
   }
 
   if (x.location.all)
-    wet_puts ("Location\n"
-              "------------\n"
-              "Name:      %s\n"
-              "Latitude:  %s\n"
-              "Longitude: %s\n",
+    wet_puts ("%s\n"
+              "----------------\n"
+              "Latitude  %s\n"
+              "Longitude %s\n",
               w.location.name,
               w.location.lat,
               w.location.lon);
 
   if (x.current_conditions.last_updated)
-    wet_puts ("last updated: %s\n", w.current_conditions.last_updated);
+    wet_puts ("last updated - %s\n", w.current_conditions.last_updated);
 
   if (x.current_conditions.temperature)
-    wet_puts ("current wind conditions: %sº%s\n",
+    wet_puts ("current temperature - %sº%s\n",
               w.current_conditions.temperature, w.units.temperature);
 
   if (x.current_conditions.dewpoint)
-    wet_puts ("current dewpoint: %sº%s\n",
+    wet_puts ("current dew point - %sº%s\n",
               w.current_conditions.dewpoint, w.units.temperature);
 
   if (x.current_conditions.text)
-    wet_puts ("current condition: %s\n", w.current_conditions.text);
+    wet_puts ("%s\n", w.current_conditions.text);
 
   if (x.current_conditions.visibility)
-    wet_puts ("current visibility: %s%s\n",
+    wet_puts ("current visibility - %s%s\n",
               w.current_conditions.visibility, w.units.distance);
 
   if (x.current_conditions.humidity)
-    wet_puts ("current humidity: %s%%\n", w.current_conditions.humidity);
+    wet_puts ("current humidity - %s%%\n", w.current_conditions.humidity);
 
   if (x.current_conditions.station)
-    wet_puts ("current local station: %s\n", w.current_conditions.station);
+    wet_puts ("current local station - %s\n", w.current_conditions.station);
 
   if (x.current_conditions.feels_like)
-    wet_puts ("feels like: %sº%s\n",
+    wet_puts ("currently feels like - %sº%s\n",
               w.current_conditions.feels_like, w.units.temperature);
 
-  if (x.current_conditions.wind.all) {
-    wet_puts ("current wind conditions: ");
+  if (x.current_conditions.wind) {
+    wet_puts ("current wind conditions - ");
     __display_wind (w.current_conditions.wind);
   }
 
-  if (x.current_conditions.moon_phase.text)
-    wet_puts ("moon phase: %s\n", w.current_conditions.moon_phase.text);
+  if (x.current_conditions.moon_phase)
+    wet_puts ("current moon phase - %s\n",
+              w.current_conditions.moon_phase.text);
 
-  if (x.current_conditions.uv.all)
-    wet_puts ("uv: %s %s\n",
+  if (x.current_conditions.uv)
+    wet_puts ("current uv index - %s (%s)\n",
               w.current_conditions.uv.index, w.current_conditions.uv.text);
 
-  if (x.current_conditions.barometer.all)
-    wet_puts ("barometer: %s%s %s\n",
+  if (x.current_conditions.barometer)
+    wet_puts ("current barometric pressure - %s%s (%s)\n",
               w.current_conditions.barometer.reading,
               w.units.rainfall,
               w.current_conditions.barometer.direction);
 
   if (x.location.lat)
-    wet_puts ("latitude: %s\n", w.location.lat);
+    wet_puts ("latitude - %s\n", w.location.lat);
 
   if (x.location.lon)
-    wet_puts ("longitude: %s\n", w.location.lon);
+    wet_puts ("longitude - %s\n", w.location.lon);
 
   if (x.location.name)
-    wet_puts ("location name: %s\n", w.location.name);
+    wet_puts ("location name - %s\n", w.location.name);
 
   for (day = 0; day < WET_FORECAST_DAYS; ++day) {
     if (x.forecasts[day].all) {
-      wet_puts ("Forecast for %s (%s)\n"
-                "----------------------\n"
-                "High                      %sº%s\n"
-                "Low                       %sº%s\n"
-                "Sunset                    %s\n"
-                "Sunrise                   %s\n"
-                "Chance of Precipitation:  %s%%\n"
-                "Humidity                  %s%%\n"
-                "Wind:                     ",
-                w.forecasts[day].day_of_week, w.forecasts[day].text,
+      wet_puts ("Forecast for ");
+      if (day == 0)
+        wet_puts ("today (%s)", w.forecasts[day].day_of_week);
+      else if (day == 1)
+        wet_puts ("tomorrow (%s)", w.forecasts[day].day_of_week);
+      else
+        wet_puts (w.forecasts[day].day_of_week);
+      if (*w.forecasts[day].text)
+        wet_puts (" - %s", w.forecasts[day].text);
+      wet_puts ("\n--------------\n"
+                "high                    - %sº%s\n"
+                "low                     - %sº%s\n"
+                "sunset                  - %s\n"
+                "sunrise                 - %s\n"
+                "chance of precipitation - %s%%\n"
+                "humidity                - %s%%\n"
+                "wind                    - ",
                 w.forecasts[day].high, w.units.temperature,
                 w.forecasts[day].low, w.units.temperature,
                 w.forecasts[day].sunset,
@@ -1060,71 +1025,88 @@ display (void)
                 w.forecasts[day].humidity);
       __display_wind (w.forecasts[day].wind);
       wet_putc ('\n');
-      wet_puts ("  %s Night (%s)\n"
-                "  -----------------------\n"
-                "  Chance of Precipitation:  %s%%\n"
-                "  Humidity:                 %s%%\n"
-                "  Wind:                     ",
-                w.forecasts[day].day_of_week, w.forecasts[day].night.text,
+      if (day == 0)
+        wet_puts ("  Tonight");
+      else if (day == 1)
+        wet_puts ("  Tomorrow night");
+      else
+        wet_puts ("  %s night", w.forecasts[day].day_of_week);
+      if (*w.forecasts[day].night.text)
+        wet_puts (" - %s", w.forecasts[day].night.text);
+      wet_puts ("\n  --------------\n"
+                "  chance of precipitation - %s%%\n"
+                "  humidity                - %s%%\n"
+                "  wind                    - ",
                 w.forecasts[day].night.chance_precip,
                 w.forecasts[day].night.humidity);
       __display_wind (w.forecasts[day].night.wind);
       wet_putc ('\n');
+      continue;
     }
     if (x.forecasts[day].day_of_week)
-      wet_puts ("day of week: %s\n", w.forecasts[day].day_of_week);
+      wet_puts ("%s\n", w.forecasts[day].day_of_week);
     if (x.forecasts[day].high)
-      print_forecast_data (day, false, "high: %sº%s",
+      print_forecast_data (day, false, "high - %sº%s",
                            w.forecasts[day].high, w.units.temperature);
     if (x.forecasts[day].low)
-      print_forecast_data (day, false, "low: %sº%s",
+      print_forecast_data (day, false, "low - %sº%s",
                            w.forecasts[day].low, w.units.temperature);
     if (x.forecasts[day].sunset)
-      print_forecast_data (day, false, "sunset: %s",
+      print_forecast_data (day, false, "sunset - %s",
                            w.forecasts[day].sunset);
     if (x.forecasts[day].sunrise)
-      print_forecast_data (day, false, "sunrise: %s",
+      print_forecast_data (day, false, "sunrise - %s",
                            w.forecasts[day].sunrise);
     if (x.forecasts[day].text)
-      print_forecast_data (day, false, ": %s", w.forecasts[day].text);
+      print_forecast_data (day, false, "%s", w.forecasts[day].text);
     if (x.forecasts[day].chance_precip)
-      print_forecast_data (day, false, "chance of precipitation: %s%%",
+      print_forecast_data (day, false, "chance of precipitation - %s%%",
                            w.forecasts[day].chance_precip);
     if (x.forecasts[day].humidity)
-      print_forecast_data (day, false, "humidity: %s%%",
+      print_forecast_data (day, false, "humidity - %s%%",
                            w.forecasts[day].humidity);
-    if (x.forecasts[day].wind.all) {
-      if (day == DAY_0)
-        wet_puts ("today's wind: ");
+    if (x.forecasts[day].wind) {
+      if (day == 0)
+        wet_puts ("today's wind - ");
       else
-        wet_puts ("%s's wind: ", w.forecasts[day].day_of_week);
+        wet_puts ("%s's wind - ", w.forecasts[day].day_of_week);
       __display_wind (w.forecasts[day].wind);
     }
     if (x.forecasts[day].night.all) {
-      wet_puts ("Forecast for %s night (%s)\n"
-                "--------------------------\n"
-                "Chance of Precipitation: %s%%\n"
-                "Humidity:                %s%%\n"
-                "Wind:                    ",
-                w.forecasts[day].day_of_week,
-                w.forecasts[day].night.text,
+      wet_puts ("Forecast for ");
+      if (day == 0)
+        wet_puts ("tonight");
+      else if (day == 1)
+        wet_puts ("tomorrow night");
+      else
+        wet_puts ("%s night", w.forecasts[day].day_of_week);
+      if (*w.forecasts[day].night.text)
+        wet_puts (" - %s\n", w.forecasts[day].night.text);
+      wet_puts ("--------------\n"
+                "chance of precipitation - %s%%\n"
+                "humidity                - %s%%\n"
+                "wind                    - ",
                 w.forecasts[day].night.chance_precip,
                 w.forecasts[day].night.humidity);
       __display_wind (w.forecasts[day].night.wind);
+      continue;
     }
     if (x.forecasts[day].night.text)
-      print_forecast_data (day, true, ": %s", w.forecasts[day].night.text);
+      print_forecast_data (day, true, "%s", w.forecasts[day].night.text);
     if (x.forecasts[day].night.chance_precip)
-      print_forecast_data (day, true, "chance of precipitation: %s%%",
+      print_forecast_data (day, true, "chance of precipitation - %s%%",
                            w.forecasts[day].night.chance_precip);
     if (x.forecasts[day].night.humidity)
-      print_forecast_data (day, true, "humidity: %s%%",
+      print_forecast_data (day, true, "humidity - %s%%",
                            w.forecasts[day].night.humidity);
-    if (x.forecasts[day].night.wind.all) {
-      if (day == DAY_0)
-        wet_puts ("tonight's wind: ");
+    if (x.forecasts[day].night.wind) {
+      if (day == 0)
+        wet_puts ("tonight");
+      else if (day == 1)
+        wet_puts ("tomorrow night");
       else
-        wet_puts ("%s night's wind: ", w.forecasts[day].day_of_week);
+        wet_puts ("%s night", w.forecasts[day].day_of_week);
+      wet_puts ("'s wind - ");
       __display_wind (w.forecasts[day].night.wind);
     }
   }
@@ -1139,11 +1121,11 @@ main (int argc, char **argv)
 
   if (!wet_weather (&w, location, metric)) {
     if (*w.error.text)
-      wet_die ("weather: %s", w.error.text);
-    wet_die ("failed to retrieve weather data");
+      wet_die (WET_EWEATHER, "weather: %s", w.error.text);
+    wet_die (WET_ENET, "failed to retrieve weather data");
   }
   display ();
-  exit (EXIT_SUCCESS);
+  exit (WET_ESUCCESS);
   return 0; /* for compiler */
 }
 

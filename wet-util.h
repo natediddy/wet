@@ -50,12 +50,12 @@
     wet_print (__WET_OUTPUT_STDERR, __tag, __VA_ARGS__); \
   } while (0)
 
-#define wet_die(...) \
+#define wet_die(e, ...) \
   do { \
     char __tag[__WET_TAG_MAX]; \
     snprintf (__tag, __WET_TAG_MAX, "%s: error:", program_name); \
     wet_print (__WET_OUTPUT_STDERR, __tag, __VA_ARGS__); \
-    exit (EXIT_FAILURE); \
+    exit (e); \
   } while (0)
 
 #define wet_free(p) \

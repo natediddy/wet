@@ -17,16 +17,25 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
+
 #include <ctype.h>
 #include <limits.h> /* INT_MIN and INT_MAX */
 #include <stdarg.h>
-#include <stdint.h> /* SIZE_MAX */
+#ifdef HAVE_STDINT_H
+# include <stdint.h> /* SIZE_MAX */
+#endif
 #include <string.h>
-#ifdef _WIN32
-# include <windows.h>
-#else
+#ifdef HAVE_SYS_IOCTL_H
 # include <sys/ioctl.h>
+#endif
+#ifdef HAVE_UNISTD_H
 # include <unistd.h>
+#endif
+#ifdef HAVE_WINDOWS_H
+# include <windows.h>
 #endif
 
 #include "wet-util.h"
@@ -84,16 +93,20 @@ wet_eputs (const char *fmt, ...)
 int
 wet_console_width (void)
 {
-#ifdef _WIN32
+#ifdef HAVE_WINDOWS_H
   CONSOLE_SCREEN_BUFFER_INFO x;
 
   if (GetConsoleScreenBufferInfo (GetStdHandle (STD_OUTPUT_HANDLE), &x))
     return x.dwSize.X;
-#else
+  return DEFAULT_CONSOLE_WIDTH;
+#endif
+
+#if defined (HAVE_SYS_IOCTL_H) && defined (HAVE_UNISTD_H)
   struct winsize x;
 
   if (ioctl (STDOUT_FILENO, TIOCGWINSZ, &x) != -1)
     return x.ws_col;
+  return DEFAULT_CONSOLE_WIDTH;
 #endif
   return DEFAULT_CONSOLE_WIDTH;
 }
@@ -208,8 +221,13 @@ wet_str2size (const char *s)
 
   n = str2ull (s);
 
+#ifdef HAVE_STDINT_H
   if (n > SIZE_MAX)
     ret = SIZE_MAX;
+#else
+  if (n > UINT_MAX)
+    ret = UINT_MAX;
+#endif
   else
     ret = (size_t) n;
   return ret;
@@ -219,7 +237,7 @@ char *
 wet_getenv (const char *key)
 {
   char *value;
-#ifdef _WIN32
+#ifdef HAVE_WINDOWS_H
   char buffer[1024];
 
   if (GetEnvironmentVariable (key, buffer, 1024) == 0)

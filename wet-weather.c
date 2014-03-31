@@ -88,7 +88,7 @@ wet_weather (struct weather *w, const char *location, bool metric)
   wet_net_get_location_id (w, location);
 
   if (!*w->location_id)
-    wet_die ("failed to find location '%s'", location);
+    wet_die (WET_EWEATHER, "failed to find location '%s'", location);
 
   wet_net_get_weather_data (w, metric);
   if (*w->error.type || *w->error.text)

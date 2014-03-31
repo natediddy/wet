@@ -20,14 +20,38 @@
 #ifndef WET_H
 #define WET_H
 
-#define WET_PROGRAM_NAME "wet"
-#define WET_VERSION      "1.5.2"
-
-#ifndef __cplusplus
-typedef signed char bool;
-# define false ((bool) 0)
-# define true  ((bool) 1)
+#ifdef HAVE_CONFIG_H
+# include "config.h"
 #endif
+
+#ifdef PACKAGE_NAME
+# define WET_PROGRAM_NAME PACKAGE_NAME
+#else
+# define WET_PROGRAM_NAME "wet"
+#endif
+
+#ifdef PACKAGE_VERSION
+# define WET_VERSION PACKAGE_VERSION
+#else
+# define WET_VERSION "1.5.4"
+#endif
+
+#ifdef HAVE_STDBOOL_H
+# include <stdbool.h>
+#else
+# ifndef __cplusplus
+typedef char bool;
+#  define false ((bool) 0)
+#  define true ((bool) 1)
+# endif
+#endif
+
+#define WET_ESUCCESS 0
+#define WET_EOP      1
+#define WET_ELOC     2
+#define WET_ENET     3
+#define WET_ESYS     4
+#define WET_EWEATHER 5
 
 extern const char *program_name;
 

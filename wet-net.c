@@ -33,12 +33,17 @@
 #include "wet-util.h"
 
 #define PORT               80
-#define GET                "GET %s HTTP/1.1\r\nHost: " HOST "\r\n\r\n"
+#define HEADER_LINE        "\r\n"
+#define HEADER_DELIMITER   HEADER_LINE HEADER_LINE
+#define USERAGENT          "WET (WEather Tool)/" WET_VERSION
 #define HOST               "wxdata.weather.com"
 #define WEATHER_DATA_PATH  "/wxdata/weather/local/%s?unit=%s&dayf=5&cc=*"
 #define WEATHER_LOCID_PATH "/wxdata/search/search?where=%s"
 
-#define HEADER_DELIMITER "\r\n\r\n"
+#define GET \
+  "GET %s HTTP/1.1" HEADER_LINE \
+  "Host: " HOST HEADER_LINE \
+  "User-Agent: " USERAGENT HEADER_DELIMITER
 
 #define HEADERMAX    1024
 #define GETMAX        512
@@ -480,12 +485,12 @@ http_get_request (const char *path)
 
   sock = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (sock == -1)
-    wet_die ("failed to create socket: %s", strerror (errno));
+    wet_die (WET_ENET, "failed to create socket: %s", strerror (errno));
 
   h = gethostbyname (HOST);
   if (!h) {
     close (sock);
-    wet_die ("failed to get host information");
+    wet_die (WET_ENET, "failed to get host information");
   }
 
   memcpy (&n_haddr, h->h_addr, h->h_length);
@@ -496,7 +501,7 @@ http_get_request (const char *path)
   wet_debug ("connecting to: \"%s%s\"", HOST, path);
   if (connect (sock, (struct sockaddr *) &a, sizeof (a)) == -1) {
     close (sock);
-    wet_die ("failed to connect socket: %s", strerror (errno));
+    wet_die (WET_ENET, "failed to connect socket: %s", strerror (errno));
   }
 
   snprintf (get, GETMAX, GET, path);
@@ -504,7 +509,7 @@ http_get_request (const char *path)
   n_write = write (sock, get, strlen (get));
   if (n_write < 0) {
     close (sock);
-    wet_die ("failed to send GET request: %s", strerror (errno));
+    wet_die (WET_ENET, "failed to send GET request: %s", strerror (errno));
   }
 
   retrieve_header (sock, header, HEADERMAX);
@@ -514,7 +519,7 @@ http_get_request (const char *path)
   wet_debug ("http status: %i (%s)", hd.status, hd.status_text);
   if (hd.status != 200) {
     close (sock);
-    wet_die ("http: %i (%s)", hd.status, hd.status_text);
+    wet_die (WET_ENET, "http: %i (%s)", hd.status, hd.status_text);
   }
 
   wet_free (content);
@@ -522,7 +527,7 @@ http_get_request (const char *path)
   content = (char *) malloc (hd.content_length + 1);
   if (!content) {
     close (sock);
-    wet_die ("failed to allocate memory: %s", strerror (errno));
+    wet_die (WET_ESYS, "failed to allocate memory: %s", strerror (errno));
   }
 
   retrieve_content (sock, hd.content_length);

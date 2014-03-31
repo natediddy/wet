@@ -1,0 +1,322 @@
+.TH WET 1 "March 2014" "1.5.4" "User Commands"
+.SH NAME
+wet - \fIWE\fPather \fIT\fPool
+.SH SYNOPSIS
+.nf
+.fam C
+\fBwet\fP [\fICOMMAND\fP [\fIOPTIONS\fP]] [\fBLOCATION\fP]
+.fam T
+.fi
+.fam T
+.fi
+.SH DESCRIPTION
+Print weather data; local or abroad.
+.SH OPTIONS
+\fICOMMAND\fPs
+.RS
+.TP
+\fBcc\fP
+current conditions data
+.TP
+\fBloc\fP
+location data
+.TP
+\fBfc\fP
+forecast data
+.TP
+\fBimperial\fP
+causes all data measurements to be in
+imperial units (e.g. farenheit, miles, etc.)
+.TP
+\fBmetric\fP
+causes all data measurements to be in
+metric units (e.g. celsius, kilometers, etc.)
+.TP
+\fBhelp\fP [\fICOMMAND\fP]
+print help information (use with \fICOMMAND\fP for help
+about that specific \fICOMMAND\fP)
+.TP
+\fBversion\fP
+print version information
+.RE
+.PP
+\fBcc\fP \fIOPTIONS\fP
+.RS
+.TP
+\fBlast-updated\fP
+when the current conditions data was last updated
+.TP
+\fBtemp\fP
+current temperature
+.TP
+\fBdewpoint\fP
+current dew point
+.TP
+\fBtext\fP
+brief description of the current conditions
+.TP
+\fBvisibility\fP
+current visibility
+.TP
+\fBhumidity\fP
+current humidity
+.TP
+\fBstation\fP
+the local station from which this data was obtained
+.TP
+\fBfeels-like\fP
+the temperature that it currently "feels like"
+.TP
+\fBmoon\fP
+current phase of the moon
+.TP
+\fBuv\fP
+current ultra-violet index
+.TP
+\fBbarometer\fP
+current barometric pressure data
+.TP
+\fBwind\fP
+current wind conditions
+.RE
+.PP
+\fBloc\fP \fIOPTIONS\fP
+.RS
+.TP
+\fBlatitude\fP
+latitude of \fBLOCATION\fP
+.TP
+\fBlongitude\fP
+longitude of \fBLOCATION\fP
+.TP
+\fBname\fP
+name of \fBLOCATION\fP
+.RE
+.PP
+\fBfc\fP \fIOPTIONS\fP
+.RS
+.TP
+\fB1\fP-\fB5\fP, \fBtoday\fP, \fBtomorrow\fP
+only print forecast data for a specific day out of the 5 day
+forecast (\fB1\fP=today [\fIDEFAULT\fP], \fB2\fP=tomorrow, etc.)
+.TP
+\fBall\fP
+print forecast data for all days in the 5 day forecast
+.TP
+\fBdow\fP
+day of the week
+.TP
+\fBhigh\fP
+forecasted high temperature
+.TP
+\fBlow\fP
+forecasted low temperature
+.TP
+\fBsunrise\fP
+time of sunrise
+.TP
+\fBsunset\fP
+time of sunset
+.TP
+\fBtext\fP
+brief description of the forecast
+.TP
+\fBcop\fP
+forecasted chance of precipitation
+.TP
+\fBhumidity\fP
+forecasted humidity
+.TP
+\fBwind\fP
+forecasted wind conditions
+.TP
+\fBnight\fP
+forecasted conditions for that night
+.RE
+.PP
+\fBfc\fP \fBnight\fP \fIOPTIONS\fP:
+.RS
+.TP
+\fBtext\fP
+brief description of the forecast for that night
+.TP
+\fBcop\fP
+forecasted chance of precipitation for that night
+.TP
+\fBhumidity\fP
+forecasted humidity for that night
+.TP
+\fBwind\fP
+forecasted wind conditions for that night
+.SH ENVIRONMENT
+There are 2 environment variables that can simplify use.
+.RS
+.TP
+\fBWET_LOCATION\fP
+set this to your desired \fBLOCATION\fP and you will no
+longer have to provide that \fBLOCATION\fP every time you
+execute this program (unless overridden on the command line)
+.TP
+\fBWET_UNITS\fP
+set this to either \fBimperial\fP or \fBmetric\fP and the
+program will always use those units (unless overridden on the command line)
+.SH EXIT STATUS
+.TP
+\fB0\fP
+success
+.TP
+\fB1\fP
+a problem concerning command line options occurred
+.TP
+\fB2\fP
+a problem concerning \fBLOCATION\fP occurred (e.g. it was neither given on the
+command line nor \fBWET_LOCATION\fP, or too many were given)
+.TP
+\fB3\fP
+a problem concerning the network occurred
+.TP
+\fB4\fP
+a problem concerning the system occurred
+.TP
+\fB5\fP
+a problem concerning the weather data occurred (e.g. \fBLOCATION\fP was
+invalid and could not be determined)
+.SH EXAMPLE
+For the sake of clarity, all of the below examples assume you want
+\fBLOCATION\fP to be New York, NY USA (zip code: 10001).
+.PP
+To be presented with a basic set of weather data, just run with no options:
+.PP
+.nf
+.fam C
+      wet 10001
+
+.fam T
+.fi
+The \fBLOCATION\fP argument may be a standard zip code or a string
+representation:
+.PP
+.nf
+.fam C
+      wet "new york city"
+
+.fam T
+.fi
+If you do not wish to provide a \fBLOCATION\fP every time, set the
+\fBWET_LOCATION\fP environment variable:
+.PP
+.nf
+.fam C
+     WET_LOCATION=10001
+
+.fam T
+.fi
+Also set your desired set of units with the \fBWET_UNITS\fP environment
+variable:
+.PP
+.nf
+.fam C
+     WET_UNITS=imperial
+
+.fam T
+.fi
+Now all future executions of wet (in the current shell) without a
+\fBLOCATION\fP will use $\fBWET_LOCATION\fP, and the same with
+$\fBWET_UNITS\fP.
+.PP
+For a more permanent solution, you may want to add something like the
+following to your \fI~/.bashrc\fP configuration file:
+.PP
+.nf
+.fam C
+     export WET_LOCATION=10001
+     export WET_UNITS=imperial
+
+.fam T
+.fi
+Then this:
+.PP
+.nf
+.fam C
+    wet imperial 10001
+
+.fam T
+.fi
+Will simply become this:
+.PP
+.nf
+.fam C
+    wet
+
+.fam T
+.fi
+All of the following examples will assume that \fBWET_LOCATION\fP and
+\fBWET_UNITS\fP are both set as mentioned above.
+.PP
+To obtain more specific data you can use the commands and their options.
+.PP
+Current temperature:
+.PP
+.nf
+.fam C
+      wet cc temp
+
+.fam T
+.fi
+Current humidity:
+.PP
+.nf
+.fam C
+      wet cc humidity
+
+.fam T
+.fi
+Current wind conditions:
+.PP
+.nf
+.fam C
+      wet cc wind
+
+.fam T
+.fi
+For today's forecasted high and low temperatures:
+.PP
+.nf
+.fam C
+      wet fc high low
+
+.fam T
+.fi
+For tomorrow's forecasted humidity:
+.PP
+.nf
+.fam C
+      wet fc tomorrow humidity
+
+.fam T
+.fi
+And for the day-after-tomorrow's complete forecast:
+.PP
+.nf
+.fam C
+      wet fc 3
+
+.fam T
+.fi
+For the complete 5 day forecast
+.PP
+.nf
+.fam C
+      wet fc all
+.fam T
+.fi
+.SH AUTHOR
+Written by Nathan Forbes.
+.SH NOTES
+All weather data is obtained from www.weather.com.
+.SH REPORTING BUGS
+Report bugs to sforbes41@gmail.com.
+.SH COPYRIGHT
+Copyright © 2014 Nathan Forbes. License GPLv3+: GNU GPL version 3 or later
+<http://gnu.org/licenses/gpl.html>. This is free software: you are free to change and redistribute it. There is
+NO WARRANTY, to the extent permitted by law.
