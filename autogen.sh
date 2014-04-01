@@ -1,34 +1,7 @@
 #!/bin/sh
 
 myname=`basename $0`
-CLEAN_ONLY=0
-RUN_ALL=0
 CONFIGURE_OPTIONS=
-
-CLEAN_FILES="*~ *.bak *.o *.in .deps Makefile aclocal.m4 \
-             autom4te.cache depcomp config.* configure install-sh \
-             missing stamp-h? compile"
-
-if test "$1" = "help" || test "$1" = "-h" || test "$1" = "--help"; then
-  echo "Usage: $0 [clean]"
-  echo "  Options:"
-  echo "    clean  -  Remove all files from previous builds"
-  echo "  No options causes $0 to run all necessary autotool commands."
-  exit 0
-elif test "$1" = "clean"; then
-  CLEAN_ONLY=1
-elif test "$1" != ""; then
-  echo "$myname: error: \`$1' not recognized (try \`help')"
-  exit 1
-fi
-
-# remove everything from previous builds
-if test -f Makefile; then
-  make distclean
-fi
-
-rm -rf $CLEAN_FILES
-test "$CLEAN_ONLY" = "1" && exit 0
 
 if test ! -f configure.ac || test ! -f wet.c; then
   echo "$myname: error: cannot run from outside the wet source directory"
