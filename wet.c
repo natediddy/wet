@@ -44,6 +44,7 @@ static const char *main_command_options[] = {
   "cc",
   "loc",
   "fc",
+  "severe",
   "imperial",
   "metric",
   "help",
@@ -132,6 +133,7 @@ static struct weather w;
 /* make this an almost mirror image of struct weather */
 static struct {
   bool location_id;
+  bool severe_weather_alert;
 
   struct {
     bool all;
@@ -272,6 +274,7 @@ help (const char *command, const char *option1)
     print_help_cmd ("cc", "Shows current conditions.");
     print_help_cmd ("loc", "Shows information about LOCATION.");
     print_help_cmd ("fc", "Shows forecast predictions.");
+    print_help_cmd ("severe", "Shows severe weather alert (if any)");
     print_help_cmd ("imperial",
                     "Causes all measurements to use imperial units "
                     "(farenheit, miles, etc.)");
@@ -480,7 +483,7 @@ help (const char *command, const char *option1)
     return;
   }
 
-  wet_die (WET_EOP, "unknown command -- `%s'", command);
+  wet_die (WET_EOP, "unknown `help' command -- `%s'", command);
 }
 
 static void
@@ -495,6 +498,8 @@ static void
 init_display_opts (void)
 {
   int i;
+
+  x.severe_weather_alert = false;
 
   x.current_conditions.all = false;
   x.current_conditions.last_updated = false;
@@ -723,6 +728,11 @@ parse_opt (int c, char **v)
 
   init_display_opts ();
 
+  if (wet_streqi (v[1], "severe")) {
+    x.severe_weather_alert = true;
+    return;
+  }
+
   if (wet_streqi (v[1], "cc")) {
     if (!v[2]) {
       x.current_conditions.all = true;
@@ -921,7 +931,23 @@ display (void)
     __display_barometer (w.current_conditions.barometer);
     wet_puts ("wind conditions - ");
     __display_wind (w.current_conditions.wind);
+    if (*w.severe_weather_alert.text) {
+      wet_puts ("\nALERT: %s\n\n", w.severe_weather_alert.text);
+      if (*w.severe_weather_alert.link)
+        wet_puts ("For more info visit:\n%s\n",
+                  w.severe_weather_alert.link);
+    }
     return;
+  }
+
+  if (x.severe_weather_alert) {
+    if (!*w.severe_weather_alert.text) {
+      wet_puts ("no severe weather alerts\n");
+      return;
+    }
+    wet_puts ("%s\n", w.severe_weather_alert.text);
+    wet_puts ("For more info visit:\n%s\n",
+              w.severe_weather_alert.link);
   }
 
   if (x.current_conditions.all) {

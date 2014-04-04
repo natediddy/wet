@@ -45,6 +45,8 @@ init_weather_struct (struct weather *w)
   w->units.temperature[0] = '\0';
   w->units.rainfall[0] = '\0';
   w->units.pressure[0] = '\0';
+  w->severe_weather_alert.text[0] = '\0';
+  w->severe_weather_alert.link[0] = '\0';
   w->current_conditions.last_updated[0] = '\0';
   w->current_conditions.temperature[0] = '\0';
   w->current_conditions.dewpoint[0] = '\0';

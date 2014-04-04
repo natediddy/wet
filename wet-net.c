@@ -121,6 +121,16 @@ fill_weather_struct (struct weather *w)
 
 
 
+  /* severe_weather_alert {{{ */
+  p = strstr (content, "<swa>");
+  if (p && *p) {
+    __find_and_assign (t0, p, "<t>", '<', w->severe_weather_alert.text);
+    __find_and_assign (t0, p, "<l>", '<', w->severe_weather_alert.link);
+  }
+  /* }}} severe_weather_alert */
+
+
+
   use_unknown_string = true;
   /* location {{{ */
   p = strstr (content, "<loc id=");

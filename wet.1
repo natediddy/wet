@@ -1,4 +1,4 @@
-.TH WET 1 "March 2014" "1.5.5" "User Commands"
+.TH WET 1 "March 2014" "1.5.6" "User Commands"
 .SH NAME
 wet - \fIWE\fPather \fIT\fPool
 .SH SYNOPSIS
@@ -23,6 +23,9 @@ location data
 .TP
 \fBfc\fP
 forecast data
+.TP
+\fBsevere\fP
+severe weather alert data (if any)
 .TP
 \fBimperial\fP
 causes all data measurements to be in
@@ -276,6 +279,14 @@ Current wind conditions:
 .nf
 .fam C
       wet cc wind
+
+.fam T
+.fi
+Severe weather alert:
+.PP
+.nf
+.fam C
+      wet severe
 
 .fam T
 .fi

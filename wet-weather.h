@@ -49,6 +49,11 @@ struct weather {
   } units;
 
   struct {
+    char text[WET_DATA_MAX];
+    char link[WET_DATA_MAX];
+  } severe_weather_alert;
+
+  struct {
     char last_updated[WET_DATA_MAX];
     char temperature[WET_DATA_MAX];
     char dewpoint[WET_DATA_MAX];
